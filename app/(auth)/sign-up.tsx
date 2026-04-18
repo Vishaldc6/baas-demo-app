@@ -44,9 +44,11 @@ export default function SignUp() {
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     try {
-      await signUp(email);
-    } catch (err) {
-      setError("An error occurred during registration.");
+      await signUp(email, password);
+    } catch (err: any) {
+      console.log({ err });
+
+      setError(err?.message || "An error occurred during registration.");
     } finally {
       if (mounted) setIsSubmitting(false); // Handle unmounting properly in real apps
     }

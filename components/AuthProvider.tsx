@@ -3,15 +3,19 @@ import { useRouter, useSegments } from "expo-router";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
+import { User as SupabaseUser } from "@supabase/supabase-js";
+import * as FirebaseAuth from "../services/firebase/auth";
+import * as SupabaseAuth from "../services/supabase/auth";
+
 type Provider = "firebase" | "supabase" | null;
-type User = { email: string } | null;
+type User = { email: string } | SupabaseUser | null;
 
 interface AuthContextType {
   provider: Provider;
   setProvider: (provider: Provider) => Promise<void>;
   user: User;
-  signIn: (email: string) => Promise<void>;
-  signUp: (email: string) => Promise<void>;
+  signIn: (email: string, password?: string) => Promise<void>;
+  signUp: (email: string, password?: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -25,7 +29,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
 
-  // Load from Storage on App Mount
   useEffect(() => {
     const loadState = async () => {
       try {
@@ -42,7 +45,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadState();
   }, []);
 
-  // Protected Route Guards logic
   useEffect(() => {
     if (!isReady || !segments) return;
 
@@ -53,10 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (segments.length === 1 && segments[0] === "index");
 
     if (!user && inTabsGroup) {
-      // Guard: Redirect unauthorized users back appropriately
       router.replace(provider ? "/(auth)/sign-in" : "/");
     } else if (user && (inAuthGroup || isRoot)) {
-      // Guard: Redirect authorized users directly to the protected section
       router.replace("/(tabs)/home");
     }
   }, [user, segments, provider, isReady]);
@@ -67,19 +67,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else await AsyncStorage.removeItem("provider");
   };
 
-  const signIn = async (email: string) => {
-    const newUser = { email };
-    setUser(newUser);
-    await AsyncStorage.setItem("user", JSON.stringify(newUser));
+  const signIn = async (email: string, password?: string) => {
+    let resultUser;
+
+    // Delegate to Business Logic / API Service
+    if (provider === "firebase") {
+      resultUser = await FirebaseAuth.signIn(email, password);
+    } else if (provider === "supabase") {
+      resultUser = await SupabaseAuth.signIn(email, password);
+    } else {
+      throw new Error("No backend provider selected");
+    }
+
+    setUser(resultUser);
+    await AsyncStorage.setItem("user", JSON.stringify(resultUser));
   };
 
-  const signUp = async (email: string) => {
-    const newUser = { email };
-    setUser(newUser);
-    await AsyncStorage.setItem("user", JSON.stringify(newUser));
+  const signUp = async (email: string, password?: string) => {
+    let resultUser;
+
+    // Delegate to Business Logic / API Service
+    if (provider === "firebase") {
+      resultUser = await FirebaseAuth.signUp(email, password);
+    } else if (provider === "supabase") {
+      resultUser = await SupabaseAuth.signUp(email, password);
+    } else {
+      throw new Error("No backend provider selected");
+    }
+
+    setUser(resultUser);
+    await AsyncStorage.setItem("user", JSON.stringify(resultUser));
   };
 
   const signOut = async () => {
+    // Delegate sign out to specific API
+    if (provider === "firebase") {
+      await FirebaseAuth.signOut();
+    } else if (provider === "supabase") {
+      await SupabaseAuth.signOut();
+    }
+
     setUser(null);
     setProviderState(null);
     await AsyncStorage.removeItem("user");

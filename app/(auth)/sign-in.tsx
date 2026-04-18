@@ -1,14 +1,14 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useAuth } from "../../components/AuthProvider";
 
@@ -39,9 +39,10 @@ export default function SignIn() {
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     try {
-      await signIn(email);
-    } catch (err) {
-      setError("An error occurred during sign in.");
+      await signIn(email, password);
+    } catch (err: any) {
+      console.log(err);
+      setError(err?.message || "An error occurred during sign in.");
     } finally {
       if (mounted) setIsSubmitting(false); // In a real app handle unmounting properly
     }
