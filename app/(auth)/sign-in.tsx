@@ -10,7 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../components/AuthProvider";
+import { Theme } from "../../constants/Theme";
 
 export default function SignIn() {
   const router = useRouter();
@@ -90,6 +92,7 @@ export default function SignIn() {
               setError("");
             }}
             editable={!isSubmitting}
+            placeholderTextColor={Theme.colors.textSecondary}
           />
         </View>
 
@@ -108,6 +111,7 @@ export default function SignIn() {
               setError("");
             }}
             editable={!isSubmitting}
+            placeholderTextColor={Theme.colors.textSecondary}
           />
         </View>
 
@@ -118,12 +122,20 @@ export default function SignIn() {
           ]}
           onPress={handleSignIn}
           disabled={isSubmitting}
+          activeOpacity={0.8}
         >
-          {isSubmitting ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
-          )}
+          <LinearGradient
+            colors={Theme.colors.primaryGradient}
+            style={styles.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.buttonText}>Sign In</Text>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
 
         <View style={styles.footer}>
@@ -143,7 +155,7 @@ export default function SignIn() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: Theme.colors.background,
   },
   formContainer: {
     flex: 1,
@@ -156,12 +168,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "800",
-    color: "#111827",
+    color: Theme.colors.text,
     marginBottom: 8,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 16,
-    color: "#6B7280",
+    color: Theme.colors.textSecondary,
     lineHeight: 24,
   },
   errorContainer: {
@@ -173,7 +186,7 @@ const styles = StyleSheet.create({
     borderColor: "#FECACA",
   },
   errorText: {
-    color: "#EF4444",
+    color: Theme.colors.error,
     fontSize: 14,
     fontWeight: "500",
   },
@@ -183,40 +196,39 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#374151",
+    color: Theme.colors.text,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Theme.colors.surface,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: Theme.colors.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: "#111827",
+    color: Theme.colors.text,
   },
   inputError: {
-    borderColor: "#EF4444",
+    borderColor: Theme.colors.error,
   },
   primaryButton: {
-    backgroundColor: "#2563EB",
-    paddingVertical: 16,
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
     marginTop: 12,
-    shadowColor: "#2563EB",
+    shadowColor: Theme.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
-    height: 56, // Fixed height to prevent jumping when loading
+    overflow: "hidden",
+  },
+  gradient: {
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
   },
   primaryButtonDisabled: {
-    backgroundColor: "#93C5FD",
-    shadowOpacity: 0,
-    elevation: 0,
+    opacity: 0.6,
   },
   buttonText: {
     color: "#FFFFFF",
@@ -229,12 +241,13 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   footerText: {
-    color: "#6B7280",
+    color: Theme.colors.textSecondary,
     fontSize: 15,
   },
   linkText: {
-    color: "#2563EB",
+    color: Theme.colors.primary,
     fontSize: 15,
     fontWeight: "600",
   },
 });
+

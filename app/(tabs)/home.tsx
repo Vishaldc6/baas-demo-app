@@ -1,69 +1,235 @@
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { useAuth } from "../../components/AuthProvider";
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Theme } from "../../constants/Theme";
+
+const MOCK_PROJECTS = [
+  {
+    id: "1",
+    name: "Brand Refresh",
+    description: "Revitalizing the visual identity with a modern palette and typography.",
+    members: 5,
+    color: "#3B82F6",
+  },
+  {
+    id: "2",
+    name: "Mobile App Design",
+    description: "Designing the core user flow and high-fidelity wireframes for iOS & Android.",
+    members: 3,
+    color: "#8B5CF6",
+  },
+  {
+    id: "3",
+    name: "Marketing Website",
+    description: "Building a high-conversion landing page with interactive product demos.",
+    members: 8,
+    color: "#10B981",
+  },
+  {
+    id: "4",
+    name: "SEO Optimization",
+    description: "Improving organic reach through technical SEO and content strategy.",
+    members: 2,
+    color: "#F59E0B",
+  },
+  {
+    id: "5",
+    name: "E-commerce Launch",
+    description: "Setting up the digital storefront and payment integration for the new collection.",
+    members: 12,
+    color: "#EF4444",
+  },
+];
 
 export default function Home() {
-  const { user } = useAuth();
+  const router = useRouter();
+
+  const renderProjectCard = ({ item }: { item: typeof MOCK_PROJECTS[0] }) => (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => router.push(`/project/${item.id}`)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.cardHeader}>
+        <View style={[styles.colorDot, { backgroundColor: item.color }]} />
+        <Text style={styles.cardTitle}>{item.name}</Text>
+      </View>
+      
+      <Text style={styles.cardDescription} numberOfLines={2}>
+        {item.description}
+      </Text>
+      
+      <View style={styles.cardFooter}>
+        <View style={styles.memberContainer}>
+          <View style={styles.avatarStack}>
+            {[1, 2, 3].map((i) => (
+              <View 
+                key={i} 
+                style={[
+                  styles.miniAvatar, 
+                  { marginLeft: i === 1 ? 0 : -8, zIndex: 5 - i }
+                ]} 
+              />
+            ))}
+          </View>
+          <Text style={styles.memberText}>{item.members} members</Text>
+        </View>
+        <Feather name="chevron-right" size={18} color={Theme.colors.textSecondary} />
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Hello, Welcome!</Text>
-        <Text style={styles.subtitle}>{user?.email}</Text>
-      </View>
+    <View style={styles.container}>
+      <FlatList
+        data={MOCK_PROJECTS}
+        renderItem={renderProjectCard}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={() => (
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Your Projects</Text>
+            <Text style={styles.headerSubtitle}>
+              You have {MOCK_PROJECTS.length} active projects
+            </Text>
+          </View>
+        )}
+      />
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Recent Activity</Text>
-        <Text style={styles.cardContent}>
-          No new activity to show right now. Check back later!
-        </Text>
-      </View>
-    </ScrollView>
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push("/project/create")}
+        activeOpacity={0.9}
+      >
+        <LinearGradient
+          colors={Theme.colors.primaryGradient}
+          style={styles.fabGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Feather name="plus" size={28} color="#FFFFFF" />
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: Theme.colors.background,
   },
-  content: {
-    padding: 24,
+  listContent: {
+    padding: Theme.spacing.lg,
+    paddingBottom: 120,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: Theme.spacing.xl,
+    marginTop: Theme.spacing.md,
   },
-  title: {
+  headerTitle: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#111827",
-    marginBottom: 4,
+    color: Theme.colors.text,
+    letterSpacing: -0.5,
   },
-  subtitle: {
+  headerSubtitle: {
     fontSize: 16,
-    color: "#6B7280",
+    color: Theme.colors.textSecondary,
+    marginTop: 4,
   },
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.radius.lg,
+    padding: Theme.spacing.lg,
+    marginBottom: Theme.spacing.md,
     borderWidth: 1,
-    borderColor: "#F3F4F6",
+    borderColor: Theme.colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  colorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#374151",
-    marginBottom: 12,
+    color: Theme.colors.text,
+    letterSpacing: -0.3,
   },
-  cardContent: {
-    fontSize: 15,
-    color: "#6B7280",
-    lineHeight: 22,
+  cardDescription: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: "#F9FAFB",
+    paddingTop: 12,
+  },
+  memberContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatarStack: {
+    flexDirection: "row",
+    marginRight: 8,
+  },
+  miniAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#E5E7EB",
+    borderWidth: 1.5,
+    borderColor: Theme.colors.surface,
+  },
+  memberText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: Theme.colors.textSecondary,
+  },
+  fab: {
+    position: "absolute",
+    bottom: 32,
+    right: 24,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    shadowColor: Theme.colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fabGradient: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

@@ -1,107 +1,198 @@
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useAuth } from "../../components/AuthProvider";
+import { Theme } from "../../constants/Theme";
 
 export default function Profile() {
-  const { user, provider, signOut } = useAuth();
+  const router = useRouter();
+  const { user, signOut } = useAuth();
+
+  const renderOption = (
+    icon: any,
+    label: string,
+    url?: string | any,
+    value?: string | number,
+    color = Theme.colors.text
+  ) => (
+    <TouchableOpacity
+      style={styles.option}
+      activeOpacity={0.6}
+      onPress={() => url && router.push(url)}
+    >
+      <View style={styles.optionLeft}>
+        <View style={[styles.iconBox, { backgroundColor: color + "10" }]}>
+          <Feather name={icon} size={20} color={color} />
+        </View>
+        <Text style={[styles.optionLabel, { color }]}>{label}</Text>
+      </View>
+      <View style={styles.optionRight}>
+        {value !== undefined && <Text style={styles.optionValue}>{value}</Text>}
+        <Feather
+          name="chevron-right"
+          size={20}
+          color={Theme.colors.textSecondary}
+        />
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.profileCard}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user?.email?.charAt(0).toUpperCase() || "U"}
-          </Text>
-        </View>
-        <Text style={styles.emailText}>{user?.email}</Text>
-        <View style={styles.badgeContainer}>
-          <Text style={styles.badgeText}>
-            {provider ? provider.toUpperCase() : "NO PROVIDER set"}
-          </Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.profileHeader}>
+        <Image
+          source={{
+            uri: `https://ui-avatars.com/api/?name=${user?.email}&background=2563EB&color=fff`,
+          }}
+          style={styles.profileImage}
+        />
+        <Text style={styles.profileName}>Account Owner</Text>
+        <Text style={styles.profileEmail}>{user?.email}</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Overview</Text>
+        <View style={styles.card}>
+          {renderOption("check-square", "My Tasks", "/task", 12)}
+          {renderOption("grid", "Active Projects", "/home", 5)}
         </View>
       </View>
 
-      <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
-        <Feather
-          name="log-out"
-          size={20}
-          color="#EF4444"
-          style={styles.buttonIcon}
-        />
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Preferences</Text>
+        <View style={styles.card}>
+          {renderOption("bell", "Notifications", "/notifications")}
+          {renderOption("shield", "Security")}
+          {renderOption("moon", "Appearance")}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Support</Text>
+        <View style={styles.card}>
+          {renderOption("help-circle", "Help Center")}
+          {renderOption("info", "About App")}
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={styles.signOutButton}
+        onPress={signOut}
+        activeOpacity={0.8}
+      >
+        <Feather name="log-out" size={20} color={Theme.colors.error} />
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
-    padding: 24,
+    backgroundColor: Theme.colors.background,
   },
-  profileCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 32,
+  content: {
+    padding: Theme.spacing.lg,
+  },
+  profileHeader: {
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
-    marginBottom: 32,
+    marginBottom: Theme.spacing.xl,
   },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#E5E7EB",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: Theme.spacing.md,
+    borderWidth: 4,
+    borderColor: Theme.colors.surface,
   },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#6B7280",
+  profileName: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: Theme.colors.text,
+    marginBottom: 4,
   },
-  emailText: {
-    fontSize: 18,
+  profileEmail: {
+    fontSize: 16,
+    color: Theme.colors.textSecondary,
+  },
+  section: {
+    marginBottom: Theme.spacing.xl,
+  },
+  sectionTitle: {
+    fontSize: 14,
     fontWeight: "600",
-    color: "#111827",
-    marginBottom: 12,
+    color: Theme.colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: Theme.spacing.sm,
+    marginLeft: Theme.spacing.xs,
   },
-  badgeContainer: {
-    backgroundColor: "#F3F4F6",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+  card: {
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.radius.lg,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
   },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#4B5563",
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: Theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.border,
+  },
+  optionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  optionRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Theme.spacing.md,
+  },
+  optionLabel: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  optionValue: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Theme.colors.primary,
+    marginRight: 8,
   },
   signOutButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FEF2F2",
-    paddingVertical: 16,
-    borderRadius: 12,
+    padding: Theme.spacing.lg,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.radius.lg,
+    marginTop: Theme.spacing.md,
     borderWidth: 1,
-    borderColor: "#FECACA",
-  },
-  buttonIcon: {
-    marginRight: 8,
+    borderColor: Theme.colors.error + "20",
   },
   signOutText: {
-    color: "#EF4444",
+    marginLeft: Theme.spacing.sm,
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
+    color: Theme.colors.error,
   },
 });

@@ -1,44 +1,52 @@
 import { Feather } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { Theme } from "../../constants/Theme";
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#2563EB",
-        tabBarInactiveTintColor: "#9CA3AF",
+        tabBarActiveTintColor: Theme.colors.primary,
+        tabBarInactiveTintColor: Theme.colors.textSecondary,
         headerShown: true,
         headerShadowVisible: false,
         tabBarStyle: {
           borderTopWidth: 1,
-          borderTopColor: "#E5E7EB",
+          borderTopColor: Theme.colors.border,
           elevation: 50,
-          backgroundColor: "#FFFFFF",
+          backgroundColor: Theme.colors.surface,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
         },
         headerStyle: {
-          backgroundColor: "#FFFFFF",
+          backgroundColor: Theme.colors.background,
         },
         headerTitleStyle: {
-          fontWeight: "700",
-          fontSize: 18,
+          fontWeight: "800",
+          fontSize: 20,
+          color: Theme.colors.text,
         },
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
-          title: "Home",
-          tabBarIcon: ({ color }) => (
-            <Feather name="home" size={24} color={color} />
+          title: "Projects",
+          tabBarLabel: "Projects",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="grid" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="chat"
         options={{
-          title: "Chat",
-          tabBarIcon: ({ color }) => (
-            <Feather name="message-circle" size={24} color={color} />
+          title: "Messages",
+          tabBarLabel: "Messages",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="message-square" size={size} color={color} />
           ),
         }}
       />
@@ -46,8 +54,9 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => (
-            <Feather name="user" size={24} color={color} />
+          tabBarLabel: "Profile",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="user" size={size} color={color} />
           ),
         }}
       />
