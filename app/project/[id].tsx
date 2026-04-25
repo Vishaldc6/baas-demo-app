@@ -16,6 +16,7 @@ import { Theme } from "../../constants/Theme";
 import { useAuth } from "../../components/AuthProvider";
 import { AddMembersModal } from "../../components/AddMembersModal";
 import * as FirebaseProject from "../../services/firebase/project";
+import * as SupabaseProject from "../../services/supabase/project";
 
 const isOwner = true; // Static role flag as requested
 
@@ -84,8 +85,12 @@ export default function ProjectDetails() {
         await FirebaseProject.addMembersToProject(id as string, members);
         Alert.alert("Success", "Members added successfully!");
         // Refresh project members here if pulling dynamically
+      } else if (provider === "supabase") {
+        await SupabaseProject.addMembersToProject(id as string, members);
+        Alert.alert("Success", "Members added successfully!");
+        // Refresh project members here if pulling dynamically
       } else {
-        Alert.alert("Notice", "Supabase add member not yet implemented in UI");
+        Alert.alert("Error", "No provider selected");
       }
     } catch (error: any) {
       console.error(error);

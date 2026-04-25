@@ -19,10 +19,12 @@ import { AddMembersModal } from "../../components/AddMembersModal";
 import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
 import * as FirebaseProject from "../../services/firebase/project";
+import * as SupabaseProject from "../../services/supabase/project";
 
 export default function CreateProject() {
   const router = useRouter();
   const { user, provider } = useAuth();
+  console.log({ user });
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -48,18 +50,24 @@ export default function CreateProject() {
     try {
       if (provider === "firebase") {
         const projectId = await FirebaseProject.createProjectFirebase(
-          (user as any).uid, // depending on user object shape
+          (user as any).id, // depending on user object shape
           { name, description, icon, color },
           selectedMembers,
         );
         console.log("Created project id: ", projectId);
 
         router.replace(`/(tabs)/home`);
-      } else {
-        Alert.alert(
-          "Notice",
-          "Supabase project creation not yet implemented in UI",
+      } else if (provider === "supabase") {
+        const projectId = await SupabaseProject.createProjectSupabase(
+          (user as any).id, // Supabase user has .id
+          { name, description, icon, color },
+          selectedMembers,
         );
+        console.log("Created supabase project id: ", projectId);
+
+        router.replace(`/(tabs)/home`);
+      } else {
+        Alert.alert("Error", "No provider selected");
       }
     } catch (error: any) {
       console.error(error);

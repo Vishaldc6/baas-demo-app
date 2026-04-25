@@ -58,30 +58,29 @@ export const createProjectFirebase = async (userId: string, projectData: any, in
     return projectId;
 };
 
-export const searchUsersByEmail = async (searchString: string) => {
-    // Basic prefix search on email or username using >= and <=
-    // For a more robust search, you might need Algolia or similar, 
-    // but for this demo we'll just do a simple query or fetch all and filter if it's small.
-    // Let's assume username is the primary search for now.
-
-    // Using a broad query and filtering in memory for this demo 
-    // since Firebase doesn't support generic 'LIKE' queries well without third party tools.
-    const snapshot = await getDocs(userRef);
-    const users: any[] = [];
+export const searchUsersByEmail = async (searchString: string, currentUserId?: string) => {
+    // We can do a prefix search using where if we know what field we're searching.
+    // Let's do prefix search on username.
     const searchLower = searchString.toLowerCase();
-
+    
     // -- PENDING --
-    // -- dont show current user from results--
-    // -- add where query --
+    // -- where query for current user != --
 
+    // Prefix search trick in Firebase:
+    // >= searchLower and <= searchLower + '\uf8ff'
+    const q = query(
+        userRef,
+        where("username", ">=", searchLower),
+        where("username", "<=", searchLower + "\uf8ff")
+    );
+
+    const snapshot = await getDocs(q);
+    const users: any[] = [];
+    
     snapshot.forEach((doc) => {
         const data = doc.data();
-        const username = (data.username || "").toLowerCase();
-        const email = (data.email || "").toLowerCase();
-
-        if (username.includes(searchLower) || email.includes(searchLower)) {
-            users.push(data);
-        }
+        if (currentUserId && data.id === currentUserId) return; // Don't show current user
+        users.push(data);
     });
 
     return users;

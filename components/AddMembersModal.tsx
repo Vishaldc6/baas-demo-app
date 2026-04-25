@@ -15,7 +15,7 @@ import { useAuth } from "./AuthProvider";
 
 // Import backend services (stub for Supabase for now)
 import * as FirebaseProject from "../services/firebase/project";
-// import * as SupabaseProject from "../services/supabase/project";
+import * as SupabaseProject from "../services/supabase/project";
 
 interface UserProfile {
   id: string;
@@ -35,11 +35,14 @@ export function AddMembersModal({
   onClose,
   onAddMembers,
 }: AddMembersModalProps) {
-  const { provider } = useAuth();
+  const { provider, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Get user id depending on provider payload
+  const currentUserId = (user as any)?.id;
 
   // Debounced search effect
   useEffect(() => {
@@ -53,10 +56,15 @@ export function AddMembersModal({
       try {
         let results: UserProfile[] = [];
         if (provider === "firebase") {
-          results = await FirebaseProject.searchUsersByEmail(searchQuery.trim());
+          results = await FirebaseProject.searchUsersByEmail(
+            searchQuery.trim(),
+            currentUserId,
+          );
         } else if (provider === "supabase") {
-          // results = await SupabaseProject.searchUsersByEmail(searchQuery.trim());
-          console.warn("Supabase project service not yet implemented");
+          results = await SupabaseProject.searchUsersByKeyword(
+            searchQuery.trim(),
+            currentUserId,
+          );
         }
         setSearchResults(results);
       } catch (error) {
@@ -113,7 +121,11 @@ export function AddMembersModal({
 
           {/* Search Bar */}
           <View style={styles.searchContainer}>
-            <Feather name="search" size={20} color={Theme.colors.textSecondary} />
+            <Feather
+              name="search"
+              size={20}
+              color={Theme.colors.textSecondary}
+            />
             <TextInput
               style={styles.searchInput}
               placeholder="Search by username or email..."
@@ -127,7 +139,10 @@ export function AddMembersModal({
 
           {/* Results List */}
           {isLoading ? (
-            <ActivityIndicator style={styles.loader} color={Theme.colors.primary} />
+            <ActivityIndicator
+              style={styles.loader}
+              color={Theme.colors.primary}
+            />
           ) : (
             <FlatList
               data={searchResults}
@@ -141,7 +156,9 @@ export function AddMembersModal({
                 )
               }
               renderItem={({ item }) => {
-                const isSelected = selectedMembers.some((m) => m.id === item.id);
+                const isSelected = selectedMembers.some(
+                  (m) => m.id === item.id,
+                );
                 return (
                   <TouchableOpacity
                     style={styles.userItem}
