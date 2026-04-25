@@ -1,12 +1,10 @@
 import {
   createUserWithEmailAndPassword,
-  getAuth,
-  signInWithEmailAndPassword,
   signOut as fbSignOut,
+  signInWithEmailAndPassword
 } from "firebase/auth";
-import { app } from "./config";
-
-const auth = getAuth(app);
+import { doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { auth, db, userRef } from "./config";
 
 export const signIn = async (email: string, password?: string) => {
   // Simulate network request
@@ -23,6 +21,16 @@ export const signIn = async (email: string, password?: string) => {
   return userCredential.user;
 };
 
+const checkUsernameExists = async (username: string) => {
+  const q = query(
+    userRef,
+    where("username", "==", username)
+  );
+
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+};
+
 export const signUp = async (email: string, password?: string) => {
   // Simulate network request
   await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -34,6 +42,20 @@ export const signUp = async (email: string, password?: string) => {
     password || "",
   );
   console.log(`[Firebase] Signed up user: ${email}`, { userCredential });
+  const username = email.split('@')[0];
+  // const userExists = await checkUsernameExists(username);
+  // if (userExists) {
+  //   throw new Error("Username already exists.");
+  // }
+
+  const uid = userCredential.user.uid;
+  await setDoc(doc(db, 'users', uid), {
+    id: uid,
+    username,
+    avatar_url: null,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp()
+  });
   return userCredential.user;
 };
 

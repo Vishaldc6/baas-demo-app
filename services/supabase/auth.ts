@@ -1,13 +1,13 @@
 import { supabase } from "./config";
 
-export const signIn = async (email: string, password?: string) => {
+export const signIn = async (email: string, password: string) => {
   // Simulate network request
   //   await new Promise((resolve) => setTimeout(resolve, 1500));
 
   // Real implementation:
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
-    password: password || "",
+    password,
   });
   console.log(`[Supabase] Signed in user: `, { data, error });
   if (error) throw error;

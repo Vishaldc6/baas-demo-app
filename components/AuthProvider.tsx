@@ -4,18 +4,19 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import { User as SupabaseUser } from "@supabase/supabase-js";
+import { User as FirebaseUser } from "firebase/auth";
 import * as FirebaseAuth from "../services/firebase/auth";
 import * as SupabaseAuth from "../services/supabase/auth";
 
 type Provider = "firebase" | "supabase" | null;
-type User = { email: string } | SupabaseUser | null;
+type UserProfile = SupabaseUser | FirebaseUser | null;
 
 interface AuthContextType {
   provider: Provider;
   setProvider: (provider: Provider) => Promise<void>;
-  user: User;
-  signIn: (email: string, password?: string) => Promise<void>;
-  signUp: (email: string, password?: string) => Promise<void>;
+  user: UserProfile;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -23,7 +24,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [provider, setProviderState] = useState<Provider>(null);
-  const [user, setUser] = useState<User>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   const router = useRouter();
@@ -67,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else await AsyncStorage.removeItem("provider");
   };
 
-  const signIn = async (email: string, password?: string) => {
+  const signIn = async (email: string, password: string) => {
     let resultUser;
 
     // Delegate to Business Logic / API Service
@@ -83,8 +84,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem("user", JSON.stringify(resultUser));
   };
 
-  const signUp = async (email: string, password?: string) => {
-    let resultUser;
+  const signUp = async (email: string, password: string) => {
+    let resultUser: UserProfile;
 
     // Delegate to Business Logic / API Service
     if (provider === "firebase") {
@@ -131,7 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ provider, setProvider, user, signIn, signUp, signOut }}
+      value={{ provider, setProvider, user, signIn, signUp, signOut,  }}
     >
       {children}
     </AuthContext.Provider>

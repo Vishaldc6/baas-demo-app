@@ -3,6 +3,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,12 +14,60 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
+import { AddMembersModal } from "../../components/AddMembersModal";
+import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
+import * as FirebaseProject from "../../services/firebase/project";
 
 export default function CreateProject() {
   const router = useRouter();
+  const { user, provider } = useAuth();
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [icon, setIcon] = useState("🚀");
+  const [color, setColor] = useState("#3B82F6");
+
+  const [selectedMembers, setSelectedMembers] = useState<any[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!name.trim()) {
+      Alert.alert("Error", "Project name is required.");
+      return;
+    }
+
+    if (!user) {
+      Alert.alert("Error", "You must be logged in to create a project.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (provider === "firebase") {
+        const projectId = await FirebaseProject.createProjectFirebase(
+          (user as any).uid, // depending on user object shape
+          { name, description, icon, color },
+          selectedMembers,
+        );
+        console.log("Created project id: ", projectId);
+
+        router.replace(`/(tabs)/home`);
+      } else {
+        Alert.alert(
+          "Notice",
+          "Supabase project creation not yet implemented in UI",
+        );
+      }
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert("Error", error.message || "Failed to create project");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -25,7 +75,10 @@ export default function CreateProject() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.navHeader}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.closeButton}
+        >
           <Feather name="x" size={24} color={Theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.navTitle}>New Project</Text>
@@ -33,6 +86,20 @@ export default function CreateProject() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Project Icon</Text>
+          <TextInput
+            style={[styles.input, styles.iconInput]}
+            value={icon}
+            onChangeText={(text) => {
+              // keep only the last character or emoji
+              setIcon(text.slice(-2));
+            }}
+            placeholder="🚀"
+            placeholderTextColor={Theme.colors.textSecondary}
+          />
+        </View>
+
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Project Name</Text>
           <TextInput
@@ -60,26 +127,83 @@ export default function CreateProject() {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Project Color</Text>
           <View style={styles.colorGrid}>
-            {["#3B82F6", "#8B5CF6", "#10B981", "#F59E0B", "#EF4444", "#EC4899"].map((color) => (
+            {[
+              "#3B82F6",
+              "#8B5CF6",
+              "#10B981",
+              "#F59E0B",
+              "#EF4444",
+              "#EC4899",
+            ].map((c) => (
               <TouchableOpacity
-                key={color}
-                style={[styles.colorOption, { backgroundColor: color }]}
+                key={c}
+                onPress={() => setColor(c)}
+                style={[
+                  styles.colorOption,
+                  { backgroundColor: c },
+                  color === c && styles.colorOptionSelected,
+                ]}
               />
             ))}
           </View>
         </View>
 
-        <TouchableOpacity style={styles.submitButton} activeOpacity={0.8}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Team Members</Text>
+          <View style={styles.membersList}>
+            {selectedMembers.map((m) => (
+              <View key={m.id} style={styles.memberAvatar}>
+                <Text style={styles.memberAvatarText}>
+                  {m.username?.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            ))}
+            <TouchableOpacity
+              style={styles.addMemberBtn}
+              onPress={() => setIsModalVisible(true)}
+            >
+              <Feather name="plus" size={20} color={Theme.colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.submitButton,
+            isSubmitting && styles.submitButtonDisabled,
+          ]}
+          activeOpacity={0.8}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
           <LinearGradient
             colors={Theme.colors.primaryGradient}
             style={styles.gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Text style={styles.submitText}>Create Project</Text>
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.submitText}>Create Project</Text>
+            )}
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
+
+      <AddMembersModal
+        visible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        onAddMembers={(members) => {
+          // Merge avoiding duplicates
+          setSelectedMembers((prev) => {
+            const newMembers = members.filter(
+              (m) => !prev.some((p) => p.id === m.id),
+            );
+            return [...prev, ...newMembers];
+          });
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -148,6 +272,39 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "transparent",
   },
+  colorOptionSelected: {
+    borderColor: Theme.colors.text,
+  },
+  membersList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Theme.colors.primary + "20",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  memberAvatarText: {
+    color: Theme.colors.primary,
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  addMemberBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderStyle: "dashed",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: Theme.colors.background,
+  },
   submitButton: {
     marginTop: Theme.spacing.xl,
     borderRadius: Theme.radius.lg,
@@ -158,6 +315,9 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
   gradient: {
     paddingVertical: 18,
     alignItems: "center",
@@ -167,5 +327,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
+  },
+  iconInput: {
+    width: 60,
+    textAlign: "center",
+    fontSize: 24,
   },
 });

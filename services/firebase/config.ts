@@ -1,7 +1,10 @@
-// Dummy Firebase Configuration
-// Replace these with your actual Firebase project configuration from the Firebase Console
+import { FirebaseOptions, initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { collection, getFirestore } from 'firebase/firestore';
 
-export const firebaseConfig = {
+// Firebase Configuration
+// Replace these with your actual Firebase project configuration from the Firebase Console
+export const firebaseConfig: FirebaseOptions = {
   apiKey: "AIzaSyDZ_EsV-CZFy65zFf9cldpyKgQAaCOSlOU",
   authDomain: "baas-demo-29e81.firebaseapp.com",
   projectId: "baas-demo-29e81",
@@ -11,6 +14,15 @@ export const firebaseConfig = {
   measurementId: "G-GFBL3MWHKW"
 };
 
-import { initializeApp } from 'firebase/app';
-// In a real scenario, you would initialize app here:
+// Initialize Firebase
 export const app = initializeApp(firebaseConfig);
+
+// auth
+export const auth = getAuth(app);
+// database
+export const db = getFirestore(app);
+
+// collection refs
+export const userRef = collection(db, 'profiles');
+export const projectRef = collection(db, 'projects');
+export const projectMembersRef = collection(db, 'project_members');

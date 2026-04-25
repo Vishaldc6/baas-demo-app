@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  Alert,
   FlatList,
   Image,
   StyleSheet,
@@ -10,7 +11,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { Theme } from "../../constants/Theme";
+import { useAuth } from "../../components/AuthProvider";
+import { AddMembersModal } from "../../components/AddMembersModal";
+import * as FirebaseProject from "../../services/firebase/project";
 
 const isOwner = true; // Static role flag as requested
 
@@ -68,7 +73,25 @@ const MOCK_TASKS = [
 export default function ProjectDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { provider } = useAuth();
+  
   const [activeTab, setActiveTab] = useState("Tasks");
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const handleAddMembers = async (members: any[]) => {
+    try {
+      if (provider === "firebase") {
+        await FirebaseProject.addMembersToProject(id as string, members);
+        Alert.alert("Success", "Members added successfully!");
+        // Refresh project members here if pulling dynamically
+      } else {
+        Alert.alert("Notice", "Supabase add member not yet implemented in UI");
+      }
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert("Error", error.message || "Failed to add members");
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -140,7 +163,10 @@ export default function ProjectDetails() {
             <View style={styles.projectNameRow}>
               <Text style={styles.projectName}>Project {id || "Details"}</Text>
               {isOwner && activeTab === "Members" && (
-                <TouchableOpacity style={styles.addMemberButton}>
+                <TouchableOpacity 
+                  style={styles.addMemberButton}
+                  onPress={() => setIsModalVisible(true)}
+                >
                   <Feather name="user-plus" size={18} color={Theme.colors.primary} />
                   <Text style={styles.addMemberText}>Add Member</Text>
                 </TouchableOpacity>
@@ -185,6 +211,12 @@ export default function ProjectDetails() {
           </LinearGradient>
         </TouchableOpacity>
       )}
+
+      <AddMembersModal
+        visible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        onAddMembers={handleAddMembers}
+      />
     </View>
   );
 }
