@@ -1,7 +1,8 @@
+import { useAuth } from "@/components/AuthProvider";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -10,6 +11,8 @@ import {
   View,
 } from "react-native";
 import { Theme } from "../../constants/Theme";
+import * as FirebaseProject from "../../services/firebase/project";
+import * as SupabaseProject from "../../services/supabase/project";
 
 const MOCK_PROJECTS = [
   {
@@ -51,8 +54,29 @@ const MOCK_PROJECTS = [
 
 export default function Home() {
   const router = useRouter();
+  const { provider } = useAuth();
 
-  const renderProjectCard = ({ item }: { item: typeof MOCK_PROJECTS[0] }) => (
+  const [projectList, setProjectList] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchAllProjects();
+  }, []);
+
+  async function fetchAllProjects() {
+    try {
+      const data =
+        provider === "firebase"
+          ? await FirebaseProject.getProjectList()
+          : await SupabaseProject.getProjectList();
+      console.log("fetchAllProjects: ", { data });
+
+      setProjectList(data as any[]);
+    } catch (error) {
+      console.log({ error });
+    }
+  }
+
+  const renderProjectCard = ({ item }: { item: (typeof projectList)[0] }) => (
     <TouchableOpacity
       style={styles.card}
       onPress={() => router.push(`/project/${item.id}`)}
@@ -80,7 +104,7 @@ export default function Home() {
               />
             ))}
           </View>
-          <Text style={styles.memberText}>{item.members} members</Text>
+          <Text style={styles.memberText}>{item.members?.length} members</Text>
         </View>
         <Feather name="chevron-right" size={18} color={Theme.colors.textSecondary} />
       </View>
@@ -90,7 +114,7 @@ export default function Home() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={MOCK_PROJECTS}
+        data={[...projectList, ...MOCK_PROJECTS]}
         renderItem={renderProjectCard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -99,7 +123,7 @@ export default function Home() {
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Your Projects</Text>
             <Text style={styles.headerSubtitle}>
-              You have {MOCK_PROJECTS.length} active projects
+              You have {[...projectList, ...MOCK_PROJECTS].length} active projects
             </Text>
           </View>
         )}

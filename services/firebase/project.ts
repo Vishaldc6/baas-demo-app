@@ -1,5 +1,5 @@
 import { collection, doc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
-import { db, projectMembersRef, userRef } from "./config";
+import { db, projectMembersRef, projectRef, userRef } from "./config";
 
 const checkMembershipExists = async (projectId: string, userId: string) => {
     const q = query(
@@ -12,7 +12,31 @@ const checkMembershipExists = async (projectId: string, userId: string) => {
     return !snapshot.empty;
 };
 
-export const createProjectFirebase = async (userId: string, projectData: any, initialMembers: any[] = []) => {
+export const getProjectList = async () => {
+    // -- PENDING -- 
+    // associate projects only
+    const snapshot = await getDocs(projectRef);
+
+    const projects: any[] = [];
+
+
+    snapshot.forEach(async (doc) => {
+        const members: any[] = [];
+        const data = doc.data();
+        
+        // -- PENDING -- 
+        // fetch members and attach with project data
+        const memberSnapshot = await getDocs(query(projectMembersRef, where("project_id", "==", doc.id)));
+        memberSnapshot.forEach(member => members.push(member.data()))
+        console.log({ data });
+
+        projects.push({ ...data, members });
+    });
+
+    return projects;
+}
+
+export const createProject = async (userId: string, projectData: any, initialMembers: any[] = []) => {
     // Generate a new unique ID for the project
     const projectDocRef = doc(collection(db, "projects"));
     const projectId = projectDocRef.id;

@@ -1,6 +1,28 @@
 import { supabase } from "./config";
 
-export const createProjectSupabase = async (
+export const getProjectList = async () => {
+
+  // -- PENDING -- 
+  // associate projects only
+  const { data: projects, error: projectError } = await supabase
+    .from("projects")
+    .select("*");
+  console.log({ projects, projectError });
+
+  const { data: projectMembers, error: projectMembersError } = await supabase.from('project_members')
+    .select('*')
+    .in('project_id', (projects || []).map((p: any) => p.id));
+  console.log({ projectMembers, projectMembersError });
+
+  const projectsWithMembers = projects?.map((p: any) => {
+    const members = projectMembers?.filter((pm: any) => pm.project_id === p.id);
+    return { ...p, members };
+  });
+
+  return projectsWithMembers
+}
+
+export const createProject = async (
   userId: string,
   projectData: any,
   initialMembers: any[] = []

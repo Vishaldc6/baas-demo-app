@@ -49,7 +49,7 @@ export default function CreateProject() {
     setIsSubmitting(true);
     try {
       if (provider === "firebase") {
-        const projectId = await FirebaseProject.createProjectFirebase(
+        const projectId = await FirebaseProject.createProject(
           (user as any).id, // depending on user object shape
           { name, description, icon, color },
           selectedMembers,
@@ -58,7 +58,7 @@ export default function CreateProject() {
 
         router.replace(`/(tabs)/home`);
       } else if (provider === "supabase") {
-        const projectId = await SupabaseProject.createProjectSupabase(
+        const projectId = await SupabaseProject.createProject(
           (user as any).id, // Supabase user has .id
           { name, description, icon, color },
           selectedMembers,
