@@ -17,6 +17,8 @@ import { useAuth } from "../../components/AuthProvider";
 import { AddMembersModal } from "../../components/AddMembersModal";
 import * as FirebaseProject from "../../services/firebase/project";
 import * as SupabaseProject from "../../services/supabase/project";
+import * as SupabaseTask from "../../services/supabase/task";
+import { supabase } from "../../services/supabase/config";
 
 const isOwner = true; // Static role flag as requested
 
@@ -78,6 +80,48 @@ export default function ProjectDetails() {
   
   const [activeTab, setActiveTab] = useState("Tasks");
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [tasks, setTasks] = useState<any[]>(MOCK_TASKS);
+  const [members, setMembers] = useState<any[]>(MOCK_MEMBERS);
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    const loadData = async () => {
+      if (!id) return;
+      setLoading(true);
+      try {
+        if (provider === "supabase") {
+          // Fetch Tasks
+          const fetchedTasks = await SupabaseTask.getTasksByProject(id as string);
+          
+          // Fetch Members
+          const { data: projectMembers, error: membersError } = await supabase
+            .from("project_members")
+            .select(`
+              user_id,
+              profiles:user_id ( id, email, full_name, avatar_url )
+            `)
+            .eq("project_id", id);
+            
+          if (membersError) throw membersError;
+
+          const formattedMembers = projectMembers?.map((pm: any) => ({
+            id: pm.profiles?.id || pm.user_id,
+            name: pm.profiles?.full_name || pm.profiles?.email || "Unknown User",
+            avatar: pm.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${pm.profiles?.full_name || 'U'}`,
+          })) || [];
+
+          setTasks([...fetchedTasks, ...MOCK_TASKS]);
+          setMembers([...formattedMembers, ...MOCK_MEMBERS]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch project data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [id, provider]);
 
   const handleAddMembers = async (members: any[]) => {
     try {
@@ -159,7 +203,7 @@ export default function ProjectDetails() {
       </View>
 
       <FlatList
-        data={activeTab === "Tasks" ? MOCK_TASKS : MOCK_MEMBERS}
+        data={activeTab === "Tasks" ? tasks : members}
         renderItem={activeTab === "Tasks" ? renderTaskItem : renderMemberItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
@@ -202,7 +246,7 @@ export default function ProjectDetails() {
       {(isOwner || activeTab === "Tasks") && activeTab === "Tasks" && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => router.push("/task/create")}
+          onPress={() => router.push(`/task/create?projectId=${id}`)}
           activeOpacity={0.9}
         >
           <LinearGradient

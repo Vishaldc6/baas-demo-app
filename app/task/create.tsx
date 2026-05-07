@@ -1,7 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
+import { useAuth } from "../../components/AuthProvider";
+import * as SupabaseTask from "../../services/supabase/task";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,6 +13,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Theme } from "../../constants/Theme";
 
@@ -22,11 +26,50 @@ const MOCK_USERS = [
 
 export default function CreateTask() {
   const router = useRouter();
+  const { projectId } = useLocalSearchParams();
+  const { user, provider } = useAuth();
+  
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assignedUser, setAssignedUser] = useState(MOCK_USERS[0]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [mockFile, setMockFile] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleCreateTask = async () => {
+    if (!title.trim()) {
+      Alert.alert("Error", "Please enter a task title");
+      return;
+    }
+    if (!projectId) {
+      Alert.alert("Error", "No project specified");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (provider === "supabase" && user) {
+        await SupabaseTask.createTask({
+          project_id: projectId as string,
+          title,
+          description,
+          // Since MOCK_USERS have IDs like "1", "2", this might fail foreign key constraints 
+          // if assignee_id must be a valid UUID in profiles. We pass it only if it's a valid uuid, 
+          // or leave it undefined for now to avoid FK errors with mock data.
+          // assignee_id: assignedUser?.id, 
+          created_by: (user as any).uid || (user as any).id,
+        });
+        Alert.alert("Success", "Task created successfully");
+        router.back();
+      } else {
+        Alert.alert("Error", "Provider not supported or user not logged in");
+      }
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to create task");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleUploadFile = () => {
     // Simulate file selection
@@ -131,14 +174,23 @@ export default function CreateTask() {
           )}
         </View>
 
-        <TouchableOpacity style={styles.submitButton} activeOpacity={0.8}>
+        <TouchableOpacity 
+          style={styles.submitButton} 
+          activeOpacity={0.8}
+          onPress={handleCreateTask}
+          disabled={loading}
+        >
           <LinearGradient
             colors={Theme.colors.primaryGradient}
             style={styles.gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Text style={styles.submitText}>Create Task</Text>
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.submitText}>Create Task</Text>
+            )}
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
