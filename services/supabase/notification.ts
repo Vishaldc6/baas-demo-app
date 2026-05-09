@@ -1,4 +1,4 @@
-import { supabase } from "./config"
+import supabase from "./config"
 
 export const fetchAllNotifications = async (userId: string) => {
     // PENDING:

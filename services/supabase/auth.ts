@@ -1,4 +1,4 @@
-import { supabase } from "./config";
+import supabase from "./config";
 
 export const signIn = async (email: string, password: string) => {
   // Simulate network request
