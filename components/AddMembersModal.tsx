@@ -13,9 +13,8 @@ import {
 import { Theme } from "../constants/Theme";
 import { useAuth } from "./AuthProvider";
 
-// Import backend services (stub for Supabase for now)
-import * as FirebaseProject from "../services/firebase/project";
-import * as SupabaseProject from "../services/supabase/project";
+import { FirebaseProject } from "../services/firebase";
+import { SupabaseProject } from "../services/supabase";
 
 interface UserProfile {
   id: string;

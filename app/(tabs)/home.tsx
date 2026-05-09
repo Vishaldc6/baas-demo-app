@@ -11,8 +11,8 @@ import {
   View,
 } from "react-native";
 import { Theme } from "../../constants/Theme";
-import * as FirebaseProject from "../../services/firebase/project";
-import * as SupabaseProject from "../../services/supabase/project";
+import { FirebaseProject } from "../../services/firebase";
+import { SupabaseProject } from "../../services/supabase";
 
 const MOCK_PROJECTS = [
   {

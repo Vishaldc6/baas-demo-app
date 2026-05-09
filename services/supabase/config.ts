@@ -10,4 +10,5 @@ export const SUPABASE_ANON_KEY =
 console.log({ SUPABASE_URL, SUPABASE_ANON_KEY });
 
 // In a real scenario, you would initialize client here:
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export default supabaseClient;

@@ -2,11 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useSegments } from "expo-router";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
-
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import { User as FirebaseUser } from "firebase/auth";
-import * as FirebaseAuth from "../services/firebase/auth";
-import * as SupabaseAuth from "../services/supabase/auth";
+
+import { FirebaseAuth } from "../services/firebase";
+import { SupabaseAuth } from "../services/supabase";
 
 type Provider = "firebase" | "supabase" | null;
 type UserProfile = SupabaseUser | FirebaseUser | null;

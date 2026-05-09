@@ -16,11 +16,12 @@ import { AddMembersModal } from "../../components/AddMembersModal";
 import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
 
-import * as FirebaseProject from "../../services/firebase/project";
-
-import * as SupabaseProject from "../../services/supabase/project";
-import * as SupabaseProjectMembers from "../../services/supabase/project_members";
-import * as SupabaseTask from "../../services/supabase/task";
+import { FirebaseProject } from "../../services/firebase";
+import {
+  SupabaseProject,
+  SupabaseProjectMembers,
+  SupabaseTask,
+} from "../../services/supabase";
 
 const isOwner = true; // Static role flag as requested
 
@@ -102,6 +103,7 @@ export default function ProjectDetails() {
           setTasks([...fetchedTasks, ...MOCK_TASKS]);
           setMembers([...fetchedMembers, ...MOCK_MEMBERS]);
         }
+        if (provider === "firebase") { }
       } catch (error) {
         console.error("Failed to fetch project data:", error);
       } finally {

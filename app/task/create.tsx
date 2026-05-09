@@ -19,7 +19,7 @@ import {
 import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
 
-import * as SupabaseTask from "../../services/supabase/task";
+import { SupabaseTask } from "../../services/supabase";
 
 const MOCK_USERS = [
   { id: "1", name: "Alex Rivera" },
