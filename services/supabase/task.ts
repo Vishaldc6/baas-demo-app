@@ -10,6 +10,7 @@ export interface TaskData {
   created_by: string;
   due_date?: string;
   position?: number;
+  attachment?: any
 }
 
 export const createTask = async (taskData: TaskData) => {
@@ -35,6 +36,21 @@ export const createTask = async (taskData: TaskData) => {
     throw new Error(error.message);
   }
 
+  // upload attached file
+  // await uploadTaskAttachment(data.id, taskData.attachment);
+
+  return data;
+};
+
+export const uploadTaskAttachment = async (taskId: string, file: File) => {
+  const { data, error } = await supabase.storage
+    .from("task-attachments")
+    .upload(`task-${taskId}/${file.name}`, file);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
   return data;
 };
 
@@ -43,6 +59,20 @@ export const getTasksByProject = async (projectId: string) => {
     .from("tasks")
     .select("*")
     .eq("project_id", projectId)
+    .order("position", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+};
+
+export const getTasksByAssignee = async (assigneeId: string) => {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("assignee_id", assigneeId)
     .order("position", { ascending: true });
 
   if (error) {

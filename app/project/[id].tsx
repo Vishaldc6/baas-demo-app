@@ -12,13 +12,15 @@ import {
   View,
 } from "react-native";
 
-import { Theme } from "../../constants/Theme";
-import { useAuth } from "../../components/AuthProvider";
 import { AddMembersModal } from "../../components/AddMembersModal";
+import { useAuth } from "../../components/AuthProvider";
+import { Theme } from "../../constants/Theme";
+
 import * as FirebaseProject from "../../services/firebase/project";
+
 import * as SupabaseProject from "../../services/supabase/project";
+import * as SupabaseProjectMembers from "../../services/supabase/project_members";
 import * as SupabaseTask from "../../services/supabase/task";
-import { supabase } from "../../services/supabase/config";
 
 const isOwner = true; // Static role flag as requested
 
@@ -94,24 +96,11 @@ export default function ProjectDetails() {
           const fetchedTasks = await SupabaseTask.getTasksByProject(id as string);
           
           // Fetch Members
-          const { data: projectMembers, error: membersError } = await supabase
-            .from("project_members")
-            .select(`
-              user_id,
-              profiles:user_id ( id, email, full_name, avatar_url )
-            `)
-            .eq("project_id", id);
-            
-          if (membersError) throw membersError;
-
-          const formattedMembers = projectMembers?.map((pm: any) => ({
-            id: pm.profiles?.id || pm.user_id,
-            name: pm.profiles?.full_name || pm.profiles?.email || "Unknown User",
-            avatar: pm.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${pm.profiles?.full_name || 'U'}`,
-          })) || [];
-
+          const fetchedMembers = await SupabaseProjectMembers.getProjectMembers(
+            id as string,
+          );
           setTasks([...fetchedTasks, ...MOCK_TASKS]);
-          setMembers([...formattedMembers, ...MOCK_MEMBERS]);
+          setMembers([...fetchedMembers, ...MOCK_MEMBERS]);
         }
       } catch (error) {
         console.error("Failed to fetch project data:", error);

@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -44,10 +44,17 @@ const MOCK_NOTIFICATIONS = [
 export default function Notifications() {
   const router = useRouter();
 
+  useEffect(() => {
+    // PENDING : fetch notifications
+  }, []);
+
+  const onNotificationPress = () => {};
+
   const renderNotification = ({ item }: { item: typeof MOCK_NOTIFICATIONS[0] }) => (
     <TouchableOpacity
       style={[styles.notificationCard, item.unread && styles.unreadCard]}
       activeOpacity={0.7}
+      onPress={onNotificationPress}
     >
       <View style={styles.contentRow}>
         <View style={styles.infoContainer}>

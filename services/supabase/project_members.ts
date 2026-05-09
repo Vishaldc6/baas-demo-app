@@ -1,3 +1,5 @@
+import { supabase } from "./config";
+
 export const getProjectMembers = async (projectId: string) => {
   const { data, error } = await supabase
     .from("project_members")

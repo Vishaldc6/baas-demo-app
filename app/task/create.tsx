@@ -1,9 +1,8 @@
 import { Feather } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
-import { useAuth } from "../../components/AuthProvider";
-import * as SupabaseTask from "../../services/supabase/task";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -16,7 +15,11 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+
+import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
+
+import * as SupabaseTask from "../../services/supabase/task";
 
 const MOCK_USERS = [
   { id: "1", name: "Alex Rivera" },
@@ -53,11 +56,12 @@ export default function CreateTask() {
           project_id: projectId as string,
           title,
           description,
-          // Since MOCK_USERS have IDs like "1", "2", this might fail foreign key constraints 
-          // if assignee_id must be a valid UUID in profiles. We pass it only if it's a valid uuid, 
+          // Since MOCK_USERS have IDs like "1", "2", this might fail foreign key constraints
+          // if assignee_id must be a valid UUID in profiles. We pass it only if it's a valid uuid,
           // or leave it undefined for now to avoid FK errors with mock data.
-          // assignee_id: assignedUser?.id, 
+          // assignee_id: assignedUser?.id,
           created_by: (user as any).uid || (user as any).id,
+          attachment: mockFile,
         });
         Alert.alert("Success", "Task created successfully");
         router.back();
@@ -71,9 +75,9 @@ export default function CreateTask() {
     }
   };
 
-  const handleUploadFile = () => {
-    // Simulate file selection
-    setMockFile("proposal_v2.pdf");
+  const handleUploadFile = async () => {
+    const result = await DocumentPicker.getDocumentAsync();
+    !result.canceled && setMockFile(result.assets[0].name);
   };
 
   const handleRemoveFile = () => {

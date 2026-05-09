@@ -4,6 +4,10 @@ export const getProjectList = async () => {
 
   // -- PENDING -- 
   // associate projects only
+
+  // fetch project ids from project_members
+  // fetch projects based on fetched ids
+
   const { data: projects, error: projectError } = await supabase
     .from("projects")
     .select("*");

@@ -59,27 +59,15 @@ export default function Profile() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Overview</Text>
-        <View style={styles.card}>
-          {renderOption("check-square", "My Tasks", "/task", 12)}
-          {renderOption("grid", "Active Projects", "/home", 5)}
-        </View>
-      </View>
-
-      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Preferences</Text>
         <View style={styles.card}>
           {renderOption("bell", "Notifications", "/notifications")}
-          {renderOption("shield", "Security")}
-          {renderOption("moon", "Appearance")}
         </View>
       </View>
-
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Support</Text>
+        <Text style={styles.sectionTitle}>Recent activity</Text>
         <View style={styles.card}>
-          {renderOption("help-circle", "Help Center")}
-          {renderOption("info", "About App")}
+          {renderOption("clock", "Recent activity")}
         </View>
       </View>
 

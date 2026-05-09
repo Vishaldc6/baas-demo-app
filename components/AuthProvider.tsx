@@ -80,6 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("No backend provider selected");
     }
 
+    // PENDING
+    // its auth user! want profile data with user id. and set it in context!
     setUser(resultUser);
     await AsyncStorage.setItem("user", JSON.stringify(resultUser));
   };
