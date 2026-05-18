@@ -171,7 +171,7 @@ export default function ProjectDetails() {
           )}
         </View>
         <View style={styles.taskMeta}>
-          <Image source={{ uri: item.assignee.avatar }} style={styles.assigneeAvatar} />
+          <Image source={{ uri: item.assignee?.avatar }} style={styles.assigneeAvatar} />
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + "15" }]}>
             <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>{item.status}</Text>
           </View>

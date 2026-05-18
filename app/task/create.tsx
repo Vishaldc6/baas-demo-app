@@ -37,7 +37,7 @@ export default function CreateTask() {
   const [assignedUser, setAssignedUser] = useState(MOCK_USERS[0]);
   const [projectMembers, setProjectMembers] = useState<any>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [mockFile, setMockFile] = useState<string | null>(null);
+  const [mockFile, setMockFile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   // PENDING
@@ -97,7 +97,7 @@ export default function CreateTask() {
 
   const handleUploadFile = async () => {
     const result = await DocumentPicker.getDocumentAsync();
-    !result.canceled && setMockFile(result.assets[0].name);
+    !result.canceled && setMockFile(result.assets[0]);
   };
 
   const handleRemoveFile = () => {
@@ -189,7 +189,7 @@ export default function CreateTask() {
             <View style={styles.fileCard}>
               <View style={styles.fileInfo}>
                 <Feather name="file-text" size={20} color={Theme.colors.textSecondary} />
-                <Text style={styles.fileName}>{mockFile}</Text>
+                <Text style={styles.fileName}>{mockFile.name}</Text>
               </View>
               <TouchableOpacity onPress={handleRemoveFile}>
                 <Feather name="trash-2" size={20} color={Theme.colors.error} />

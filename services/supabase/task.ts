@@ -37,21 +37,52 @@ export const createTask = async (taskData: TaskData) => {
   }
 
   // upload attached file
-  // await uploadTaskAttachment(data.id, taskData.attachment);
+  if (taskData.attachment) {
+    const publicUrl = await uploadTaskAttachment(data.id, taskData.attachment);
+    data.attachment = publicUrl;
+  }
 
   return data;
 };
 
-export const uploadTaskAttachment = async (taskId: string, file: File) => {
-  const { data, error } = await supabase.storage
-    .from("task-attachments")
-    .upload(`task-${taskId}/${file.name}`, file);
+export const uploadTaskAttachment = async (taskId: string, file: any): Promise<string> => {
+  const fileName = file.name || "attachment.file";
+  const filePath = `task-${taskId}/${fileName}`;
 
-  if (error) {
-    throw new Error(error.message);
+  // Read the file as a blob for upload
+  const response = await fetch(file.uri);
+  const blob = await response.blob();
+
+  // Upload to the "task-attachments" bucket (upsert to overwrite previous attachment)
+  const { error: uploadError } = await supabase.storage
+    .from("task-attachments")
+    .upload(filePath, blob, {
+      contentType: file.mimeType || "application/octet-stream",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    throw new Error(`Failed to upload attachment: ${uploadError.message}`);
   }
 
-  return data;
+  // Get the public URL
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("task-attachments").getPublicUrl(filePath);
+
+  // -- PENDING --
+  // attachment column not found error
+  // Update the task with the new attachment URL
+  // const { error: updateError } = await supabase
+  //   .from("tasks")
+  //   .update({ attachment: publicUrl })
+  //   .eq("id", taskId);
+
+  // if (updateError) {
+  //   throw new Error(`Failed to update task with attachment: ${updateError.message}`);
+  // }
+
+  return publicUrl;
 };
 
 export const getTasksByProject = async (projectId: string) => {
