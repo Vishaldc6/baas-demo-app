@@ -2,14 +2,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useSegments } from "expo-router";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { User as SupabaseUser } from "@supabase/supabase-js";
-import { User as FirebaseUser } from "firebase/auth";
 
-import { FirebaseAuth } from "../services/firebase";
-import { SupabaseAuth } from "../services/supabase";
+import { FirebaseAuth, FirebaseProfile } from "../services/firebase";
+import { SupabaseAuth, SupabaseProfile } from "../services/supabase";
+import type { ProfileData } from "../services/supabase/profile";
 
 type Provider = "firebase" | "supabase" | null;
-type UserProfile = SupabaseUser | FirebaseUser | null;
+
+// Unified profile type used throughout the app
+export type UserProfile = ProfileData | null;
 
 interface AuthContextType {
   provider: Provider;
@@ -18,13 +19,14 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [provider, setProviderState] = useState<Provider>(null);
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<UserProfile>(null);
   const [isReady, setIsReady] = useState(false);
 
   const router = useRouter();
@@ -68,38 +70,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else await AsyncStorage.removeItem("provider");
   };
 
+  /**
+   * After auth sign-in/sign-up, fetch the actual profile data
+   * from the profiles/users table and store that in context.
+   */
+  const fetchAndSetProfile = async (authUserId: string, p: Provider = provider) => {
+    let profile = null;
+    if (p === "firebase") {
+      profile = await FirebaseProfile.getProfile(authUserId);
+    } else if (p === "supabase") {
+      profile = await SupabaseProfile.getProfile(authUserId);
+    }
+    if (profile) {
+      setUser(profile as any);
+      await AsyncStorage.setItem("user", JSON.stringify(profile));
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
-    let resultUser;
+    let authUser;
 
     // Delegate to Business Logic / API Service
     if (provider === "firebase") {
-      resultUser = await FirebaseAuth.signIn(email, password);
+      authUser = await FirebaseAuth.signIn(email, password);
+      // Firebase: fetch profile data from Firestore users collection
+      await fetchAndSetProfile(authUser.uid, "firebase");
     } else if (provider === "supabase") {
-      resultUser = await SupabaseAuth.signIn(email, password);
+      authUser = await SupabaseAuth.signIn(email, password);
+      // Supabase: fetch profile data from profiles table
+      await fetchAndSetProfile(authUser.id, "supabase");
     } else {
       throw new Error("No backend provider selected");
     }
-
-    // PENDING
-    // its auth user! want profile data with user id. and set it in context!
-    setUser(resultUser);
-    await AsyncStorage.setItem("user", JSON.stringify(resultUser));
   };
 
   const signUp = async (email: string, password: string) => {
-    let resultUser: UserProfile;
+    let authUser;
 
     // Delegate to Business Logic / API Service
     if (provider === "firebase") {
-      resultUser = await FirebaseAuth.signUp(email, password);
+      authUser = await FirebaseAuth.signUp(email, password);
+      // Firebase: profile is created in Auth signup, fetch it
+      await fetchAndSetProfile(authUser.uid, "firebase");
     } else if (provider === "supabase") {
-      resultUser = await SupabaseAuth.signUp(email, password);
+      authUser = await SupabaseAuth.signUp(email, password);
+      // Supabase: profile is auto-created by trigger, fetch it
+      await fetchAndSetProfile(authUser!.id, "supabase");
     } else {
       throw new Error("No backend provider selected");
     }
+  };
 
-    setUser(resultUser);
-    await AsyncStorage.setItem("user", JSON.stringify(resultUser));
+  /**
+   * Re-fetch the profile from the database.
+   * Call this after updating profile fields or avatar.
+   */
+  const refreshProfile = async () => {
+    if (!user?.id || !provider) return;
+    await fetchAndSetProfile(user.id, provider);
   };
 
   const signOut = async () => {
@@ -134,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ provider, setProvider, user, signIn, signUp, signOut,  }}
+      value={{ provider, setProvider, user, signIn, signUp, signOut, refreshProfile }}
     >
       {children}
     </AuthContext.Provider>

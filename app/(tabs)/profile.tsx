@@ -1,32 +1,125 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React from "react";
+import * as ImagePicker from "expo-image-picker";
+import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
+import { FirebaseProfile } from "../../services/firebase";
+import { SupabaseProfile } from "../../services/supabase";
 
 export default function Profile() {
-  const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshProfile, provider } = useAuth();
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Edit form state — initialised from context user
+  const [username, setUsername] = useState(user?.username ?? "");
+  console.log({ user });
+
+  const avatarUri =
+    user?.avatar_url ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      user?.username || "U",
+    )}&background=2563EB&color=fff&size=200`;
+
+  const handlePickAvatar = async () => {
+    if (!provider || !user?.id) return;
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission needed",
+        "Please allow access to your photo library to change your avatar.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (result.canceled) return;
+    
+    const pickedUri = result.assets[0].uri;
+
+    try {
+      setIsUploading(true);
+      if (provider === "supabase") {
+        await SupabaseProfile.uploadAvatar(user.id, pickedUri);
+      } else if (provider === "firebase") {
+        await FirebaseProfile.uploadAvatar(user.id, pickedUri);
+      }
+      await refreshProfile();
+    } catch (err: any) {
+      console.log({ err });
+
+      Alert.alert("Upload failed", err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // ── Save profile edits ─────────────────────────────────────────
+  const handleSave = async () => {
+    if (!user?.id || !provider) return;
+
+    if (!username.trim()) {
+      Alert.alert("Validation", "Username cannot be empty.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      if (provider === "supabase") {
+        await SupabaseProfile.updateProfile(user.id, {
+          username: username.trim(),
+        });
+      } else if (provider === "firebase") {
+        await FirebaseProfile.updateProfile(user.id, {
+          username: username.trim(),
+        });
+      }
+      await refreshProfile();
+      setIsEditing(false);
+    } catch (err: any) {
+      Alert.alert("Update failed", err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    // Reset form to current profile values
+    setUsername(user?.username ?? "");
+    setIsEditing(false);
+  };
+
+  // ── Helper: settings option row ────────────────────────────────
   const renderOption = (
     icon: any,
     label: string,
-    url?: string | any,
-    value?: string | number,
-    color = Theme.colors.text
+    onPress?: () => void,
+    color = Theme.colors.text,
   ) => (
     <TouchableOpacity
       style={styles.option}
       activeOpacity={0.6}
-      onPress={() => url && router.push(url)}
+      onPress={onPress}
     >
       <View style={styles.optionLeft}>
         <View style={[styles.iconBox, { backgroundColor: color + "10" }]}>
@@ -34,51 +127,111 @@ export default function Profile() {
         </View>
         <Text style={[styles.optionLabel, { color }]}>{label}</Text>
       </View>
-      <View style={styles.optionRight}>
-        {value !== undefined && <Text style={styles.optionValue}>{value}</Text>}
-        <Feather
-          name="chevron-right"
-          size={20}
-          color={Theme.colors.textSecondary}
-        />
-      </View>
+      <Feather
+        name="chevron-right"
+        size={20}
+        color={Theme.colors.textSecondary}
+      />
     </TouchableOpacity>
   );
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.profileHeader}>
-        <Image
-          source={{
-            uri: `https://ui-avatars.com/api/?name=${user?.email}&background=2563EB&color=fff`,
-          }}
-          style={styles.profileImage}
-        />
-        <Text style={styles.profileName}>Account Owner</Text>
-        <Text style={styles.profileEmail}>{user?.email}</Text>
+        <TouchableOpacity
+          onPress={isEditing ? handlePickAvatar : undefined}
+          activeOpacity={0.8}
+          style={styles.avatarWrapper}
+        >
+          <Image source={{ uri: avatarUri }} style={styles.profileImage} />
+          {isEditing && (
+            <View style={styles.cameraBadge}>
+              {isUploading ? (
+                <ActivityIndicator size={12} color="#fff" />
+              ) : (
+                <Feather name="camera" size={14} color="#fff" />
+              )}
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {!isEditing ? (
+          <>
+            <Text style={styles.profileName}>
+              {user?.username || "New User"}
+            </Text>
+            <Text style={styles.profileUsername}>@{user?.username}</Text>
+          </>
+        ) : null}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-        <View style={styles.card}>
-          {renderOption("bell", "Notifications", "/notifications")}
-        </View>
-      </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent activity</Text>
-        <View style={styles.card}>
-          {renderOption("clock", "Recent activity")}
-        </View>
-      </View>
+      {isEditing ? (
+        <View style={styles.editSection}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Username</Text>
+            <TextInput
+              style={styles.input}
+              value={username}
+              onChangeText={setUsername}
+              placeholder="Your username"
+              placeholderTextColor={Theme.colors.textSecondary}
+              autoCapitalize="none"
+              editable={!isSaving}
+            />
+          </View>
 
-      <TouchableOpacity
-        style={styles.signOutButton}
-        onPress={signOut}
-        activeOpacity={0.8}
-      >
-        <Feather name="log-out" size={20} color={Theme.colors.error} />
-        <Text style={styles.signOutText}>Sign Out</Text>
-      </TouchableOpacity>
+          <View style={styles.editActions}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={handleCancelEdit}
+              disabled={isSaving}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+              onPress={handleSave}
+              disabled={isSaving}
+              activeOpacity={0.8}
+            >
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <>
+          {/* Action cards */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Account</Text>
+            <View style={styles.card}>
+              {renderOption("edit-3", "Edit Profile", () => setIsEditing(true))}
+              {renderOption("bell", "Notifications")}
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Activity</Text>
+            <View style={styles.card}>
+              {renderOption("clock", "Recent Activity")}
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.signOutButton}
+            onPress={signOut}
+            activeOpacity={0.8}
+          >
+            <Feather name="log-out" size={20} color={Theme.colors.error} />
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -90,29 +243,126 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: Theme.spacing.lg,
+    paddingBottom: 60,
   },
   profileHeader: {
     alignItems: "center",
     marginBottom: Theme.spacing.xl,
   },
+  avatarWrapper: {
+    position: "relative",
+    marginBottom: Theme.spacing.md,
+  },
   profileImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginBottom: Theme.spacing.md,
     borderWidth: 4,
+    borderColor: Theme.colors.surface,
+  },
+  cameraBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Theme.colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
     borderColor: Theme.colors.surface,
   },
   profileName: {
     fontSize: 22,
     fontWeight: "800",
     color: Theme.colors.text,
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  profileEmail: {
+  profileUsername: {
+    fontSize: 15,
+    color: Theme.colors.primary,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  profileBio: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+    maxWidth: 260,
+  },
+
+  // ── Edit form ───────────────────────────
+  editSection: {
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.radius.lg,
+    padding: Theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    marginBottom: Theme.spacing.xl,
+  },
+  inputGroup: {
+    marginBottom: Theme.spacing.md,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Theme.colors.textSecondary,
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  input: {
+    backgroundColor: Theme.colors.background,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 16,
+    color: Theme.colors.text,
+  },
+  bioInput: {
+    minHeight: 80,
+    textAlignVertical: "top",
+    paddingTop: 12,
+  },
+  editActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: Theme.spacing.sm,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Theme.radius.sm,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
     color: Theme.colors.textSecondary,
   },
+  saveButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Theme.radius.sm,
+    backgroundColor: Theme.colors.primary,
+    alignItems: "center",
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#fff",
+  },
+
+  // ── Options / Cards ─────────────────────
   section: {
     marginBottom: Theme.spacing.xl,
   },
@@ -144,10 +394,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  optionRight: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
   iconBox: {
     width: 36,
     height: 36,
@@ -160,12 +406,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
   },
-  optionValue: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: Theme.colors.primary,
-    marginRight: 8,
-  },
+
+  // ── Sign Out ────────────────────────────
   signOutButton: {
     flexDirection: "row",
     alignItems: "center",
