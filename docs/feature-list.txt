@@ -1,0 +1,24 @@
+profile
+- edit
+
+project 
+- list with member and tasks
+- create + invite member
+- update [already in profile, task status - no need]
+
+tasks
+- list only assigned
+- create + assignment
+- update [status, assignee]
+
+chat
+- chat within project 
+
+notification
+- list
+- read
+- create for assignment
+
+activity log
+- list
+- create for any activity (NOT SURE)
