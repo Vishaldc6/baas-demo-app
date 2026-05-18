@@ -5,7 +5,8 @@ export const getProjectMembers = async (projectId: string) => {
     .from("project_members")
     .select(`
       user_id,
-      profiles:user_id ( id, email, username, avatar_url )
+      role,
+      profiles:user_id ( id, username, avatar_url )
     `)
     .eq("project_id", projectId);
 
@@ -15,6 +16,7 @@ export const getProjectMembers = async (projectId: string) => {
   return data.map((item: any) => ({
     id: item.profiles?.id || item.user_id,
     name: item.profiles?.username || item.profiles?.email || 'Unknown',
-    avatar: item.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${item.profiles?.username || 'U'}`
+    avatar: item.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${item.profiles?.username || 'U'}`,
+    role: item.role
   }));
 };

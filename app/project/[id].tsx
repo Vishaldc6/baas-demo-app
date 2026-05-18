@@ -26,9 +26,24 @@ import {
 const isOwner = true; // Static role flag as requested
 
 const MOCK_MEMBERS = [
-  { id: "1", name: "Alex Rivera", avatar: "https://i.pravatar.cc/150?u=alex" },
-  { id: "2", name: "Sarah Chen", avatar: "https://i.pravatar.cc/150?u=sarah" },
-  { id: "3", name: "Mike Ross", avatar: "https://i.pravatar.cc/150?u=mike" },
+  {
+    id: "1",
+    name: "Alex Rivera",
+    avatar: "https://i.pravatar.cc/150?u=alex",
+    role: "member",
+  },
+  {
+    id: "2",
+    name: "Sarah Chen",
+    avatar: "https://i.pravatar.cc/150?u=sarah",
+    role: "member",
+  },
+  {
+    id: "3",
+    name: "Mike Ross",
+    avatar: "https://i.pravatar.cc/150?u=mike",
+    role: "member",
+  },
 ];
 
 const MOCK_TASKS = [
@@ -173,7 +188,7 @@ export default function ProjectDetails() {
       <Image source={{ uri: item.avatar }} style={styles.memberAvatar} />
       <View style={styles.memberInfo}>
         <Text style={styles.memberName}>{item.name}</Text>
-        <Text style={styles.memberRole}>Contributor</Text>
+        <Text style={styles.memberRole}>{item.role}</Text>
       </View>
       <TouchableOpacity style={styles.messageButton}>
         <Feather name="message-square" size={18} color={Theme.colors.primary} />
@@ -306,8 +321,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 8,
+    gap: Theme.spacing.lg,
   },
   projectName: {
+    flex: 1,
     fontSize: 28,
     fontWeight: "800",
     color: Theme.colors.text,

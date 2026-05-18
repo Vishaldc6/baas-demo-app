@@ -19,7 +19,7 @@ import {
 import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
 
-import { SupabaseTask } from "../../services/supabase";
+import { SupabaseProjectMembers, SupabaseTask } from "../../services/supabase";
 
 const MOCK_USERS = [
   { id: "1", name: "Alex Rivera" },
@@ -35,10 +35,33 @@ export default function CreateTask() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assignedUser, setAssignedUser] = useState(MOCK_USERS[0]);
+  const [projectMembers, setProjectMembers] = useState<any>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [mockFile, setMockFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // PENDING
+  // fetch project members for assignee dropdown
+  const fetchProjectMembers = async () => {
+    if (provider === "supabase" && user) {
+      try {
+        const members = await SupabaseProjectMembers.getProjectMembers(
+          projectId as string,
+        );
+        setProjectMembers(members);
+      } catch (error) {
+        console.error("Failed to fetch project members:", error);
+      }
+    }
+  };
+
+  // PENDING
+  // fetch project members for assignee dropdown
+  React.useEffect(() => {
+    fetchProjectMembers();
+  }, []);
+
+  
   const handleCreateTask = async () => {
     if (!title.trim()) {
       Alert.alert("Error", "Please enter a task title");
@@ -56,10 +79,7 @@ export default function CreateTask() {
           project_id: projectId as string,
           title,
           description,
-          // Since MOCK_USERS have IDs like "1", "2", this might fail foreign key constraints
-          // if assignee_id must be a valid UUID in profiles. We pass it only if it's a valid uuid,
-          // or leave it undefined for now to avoid FK errors with mock data.
-          // assignee_id: assignedUser?.id,
+          assignee_id: assignedUser?.id,
           created_by: (user as any).uid || (user as any).id,
           attachment: mockFile,
         });
@@ -134,7 +154,7 @@ export default function CreateTask() {
           
           {showDropdown && (
             <View style={styles.dropdown}>
-              {MOCK_USERS.map((user) => (
+              {projectMembers.map((user) => (
                 <TouchableOpacity 
                   key={user.id} 
                   style={styles.dropdownOption}

@@ -53,11 +53,12 @@ export const createProject = async (
 
   // Prepare members payload
   const membersToInsert = [
-    {
-      project_id: projectId,
-      user_id: userId,
-      role: "owner",
-    },
+    // ALREADY CREATED IN Supabase Project Creation function
+    // {
+    //   project_id: projectId,
+    //   user_id: userId,
+    //   role: "owner",
+    // },
   ];
 
   for (const member of initialMembers) {
@@ -71,12 +72,15 @@ export const createProject = async (
   }
 
   // Insert all members
-  const { error: membersError } = await supabase
-    .from("project_members")
-    .insert(membersToInsert);
+  if (membersToInsert.length) {
+    const { error: membersError } = await supabase
+      .from("project_members")
+      .insert(membersToInsert);
 
-  if (membersError) {
-    throw new Error(`Failed to add members: ${membersError.message}`);
+
+    if (membersError) {
+      throw new Error(`Failed to add members: ${membersError.message}`);
+    }
   }
 
   return projectId;
