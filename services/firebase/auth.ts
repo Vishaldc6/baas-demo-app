@@ -4,7 +4,7 @@ import {
   signInWithEmailAndPassword
 } from "firebase/auth";
 import { doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
-import { auth, db, userRef } from "./config";
+import { auth, userRef } from "./config";
 
 export const signIn = async (email: string, password?: string) => {
   // Simulate network request
@@ -49,7 +49,7 @@ export const signUp = async (email: string, password?: string) => {
   // }
 
   const uid = userCredential.user.uid;
-  await setDoc(doc(db, 'users', uid), {
+  await setDoc(doc(userRef, uid), {
     id: uid,
     username,
     avatar_url: null,

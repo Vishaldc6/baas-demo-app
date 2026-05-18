@@ -17,21 +17,20 @@ export const getProjectList = async () => {
     // associate projects only
     const snapshot = await getDocs(projectRef);
 
-    const projects: any[] = [];
+    const projects = await Promise.all(
+        snapshot.docs.map(async (doc) => {
+            const data = doc.data();
 
+            // -- PENDING -- 
+            // fetch members and attach with project data
+            const memberSnapshot = await getDocs(query(projectMembersRef, where("project_id", "==", doc.id)));
+            const members = memberSnapshot.docs.map(member => member.data());
+            console.log({ data });
 
-    snapshot.forEach(async (doc) => {
-        const members: any[] = [];
-        const data = doc.data();
-        
-        // -- PENDING -- 
-        // fetch members and attach with project data
-        const memberSnapshot = await getDocs(query(projectMembersRef, where("project_id", "==", doc.id)));
-        memberSnapshot.forEach(member => members.push(member.data()))
-        console.log({ data });
-
-        projects.push({ ...data, members });
-    });
+            // projects.push({ ...data, members });
+            return { ...data, members }
+        })
+    );
 
     return projects;
 }

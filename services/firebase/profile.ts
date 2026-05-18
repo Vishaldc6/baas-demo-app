@@ -1,14 +1,9 @@
 import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
-import { app, db } from "./config";
+import { app, db, userRef } from "./config";
 
 // Initialize Firebase Storage
 const storage = getStorage(app);
-
-// NOTE: auth.ts writes user profile to 'users' collection on signup.
-// If your Firestore collection is named differently (e.g. 'profiles'),
-// update the collection name below to match.
-const USERS_COLLECTION = "users";
 
 export interface ProfileData {
   id: string;
@@ -28,7 +23,7 @@ export interface UpdateProfileData {
  */
 export const getProfile = async (userId: string): Promise<ProfileData> => {
   // getDoc fetches a single document by its reference
-  const docRef = doc(db, USERS_COLLECTION, userId);
+  const docRef = doc(userRef, userId);
   const snapshot = await getDoc(docRef);
 
   if (!snapshot.exists()) {
@@ -47,7 +42,7 @@ export const updateProfile = async (
   updates: UpdateProfileData
 ): Promise<ProfileData> => {
   // updateDoc merges only the provided fields
-  const docRef = doc(db, USERS_COLLECTION, userId);
+  const docRef = doc(userRef, userId);
   await updateDoc(docRef, {
     ...updates,
     updated_at: serverTimestamp(),

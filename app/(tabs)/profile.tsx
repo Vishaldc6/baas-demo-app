@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -211,7 +212,7 @@ export default function Profile() {
             <Text style={styles.sectionTitle}>Account</Text>
             <View style={styles.card}>
               {renderOption("edit-3", "Edit Profile", () => setIsEditing(true))}
-              {renderOption("bell", "Notifications")}
+              {renderOption("bell", "Notifications", () => router.push("/notifications"))}
             </View>
           </View>
 
