@@ -85,6 +85,18 @@ export const uploadTaskAttachment = async (taskId: string, file: any): Promise<s
   return publicUrl;
 };
 
+export const updateTask = async (taskId: string, updates: Partial<TaskData>) => {
+  const { error } = await supabase
+    .from("tasks")
+    .update(updates)
+    .eq("id", taskId);
+
+  if (error) throw new Error(error.message);
+};
+
+// TODO: Task reorder (update position field on multiple tasks)
+// TODO: Task delete
+
 export const getTasksByProject = async (projectId: string) => {
   const { data, error } = await supabase
     .from("tasks")

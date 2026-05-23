@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
-import * as DocumentPicker from "expo-document-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,56 +13,52 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Alert,
-  ActivityIndicator,
 } from "react-native";
 
 import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
-
+import { FirebaseProject, FirebaseTask } from "../../services/firebase";
 import { SupabaseProjectMembers, SupabaseTask } from "../../services/supabase";
 
-const MOCK_USERS = [
-  { id: "1", name: "Alex Rivera" },
-  { id: "2", name: "Sarah Chen" },
-  { id: "3", name: "Mike Ross" },
-];
+// TODO: Task detail/edit screen (task/[id].tsx)
+// TODO: Task delete
+// TODO: Task reorder
 
 export default function CreateTask() {
   const router = useRouter();
   const { projectId } = useLocalSearchParams();
   const { user, provider } = useAuth();
-  
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [assignedUser, setAssignedUser] = useState(MOCK_USERS[0]);
-  const [projectMembers, setProjectMembers] = useState<any>([]);
+  const [assignedUser, setAssignedUser] = useState<any>(null);
+  const [projectMembers, setProjectMembers] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [mockFile, setMockFile] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // PENDING
-  // fetch project members for assignee dropdown
-  const fetchProjectMembers = async () => {
-    if (provider === "supabase" && user) {
-      try {
-        const members = await SupabaseProjectMembers.getProjectMembers(
-          projectId as string,
-        );
-        setProjectMembers(members);
-      } catch (error) {
-        console.error("Failed to fetch project members:", error);
-      }
-    }
-  };
-
-  // PENDING
-  // fetch project members for assignee dropdown
-  React.useEffect(() => {
+  useEffect(() => {
     fetchProjectMembers();
   }, []);
 
-  
+  const fetchProjectMembers = async () => {
+    if (!projectId || !provider || !user?.id) return;
+    setLoading(true);
+    try {
+      let members: any[] = [];
+      if (provider === "supabase") {
+        members = await SupabaseProjectMembers.getProjectMembers(projectId as string);
+      } else if (provider === "firebase") {
+        members = await FirebaseProject.getProjectMembers(projectId as string);
+      }
+      setProjectMembers(members || []);
+    } catch (error) {
+      console.error("Failed to fetch project members:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCreateTask = async () => {
     if (!title.trim()) {
       Alert.alert("Error", "Please enter a task title");
@@ -72,36 +69,32 @@ export default function CreateTask() {
       return;
     }
 
-    setLoading(true);
+    setIsSubmitting(true);
     try {
-      if (provider === "supabase" && user) {
-        await SupabaseTask.createTask({
-          project_id: projectId as string,
-          title,
-          description,
-          assignee_id: assignedUser?.id,
-          created_by: (user as any).uid || (user as any).id,
-          attachment: mockFile,
-        });
-        Alert.alert("Success", "Task created successfully");
-        router.back();
+      const taskPayload = {
+        project_id: projectId as string,
+        title: title.trim(),
+        description: description.trim(),
+        assignee_id: assignedUser?.id || null,
+        created_by: user?.id || "",
+      };
+
+      if (provider === "supabase") {
+        await SupabaseTask.createTask(taskPayload);
+      } else if (provider === "firebase") {
+        await FirebaseTask.createTask(taskPayload);
       } else {
-        Alert.alert("Error", "Provider not supported or user not logged in");
+        Alert.alert("Error", "No provider selected");
+        return;
       }
+
+      Alert.alert("Success", "Task created successfully");
+      router.back();
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to create task");
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
-  };
-
-  const handleUploadFile = async () => {
-    const result = await DocumentPicker.getDocumentAsync();
-    !result.canceled && setMockFile(result.assets[0]);
-  };
-
-  const handleRemoveFile = () => {
-    setMockFile(null);
   };
 
   return (
@@ -143,66 +136,84 @@ export default function CreateTask() {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Assign User</Text>
-          <TouchableOpacity 
-            style={styles.selector} 
-            onPress={() => setShowDropdown(!showDropdown)}
-          >
-            <Text style={styles.selectorText}>{assignedUser.name}</Text>
-            <Feather name={showDropdown ? "chevron-up" : "chevron-down"} size={20} color={Theme.colors.textSecondary} />
-          </TouchableOpacity>
-          
-          {showDropdown && (
-            <View style={styles.dropdown}>
-              {projectMembers.map((user) => (
-                <TouchableOpacity 
-                  key={user.id} 
-                  style={styles.dropdownOption}
-                  onPress={() => {
-                    setAssignedUser(user);
-                    setShowDropdown(false);
-                  }}
-                >
-                  <Text style={[
-                    styles.dropdownOptionText,
-                    assignedUser.id === user.id && styles.activeDropdownOptionText
-                  ]}>
-                    {user.name}
-                  </Text>
-                  {assignedUser.id === user.id && (
-                    <Feather name="check" size={16} color={Theme.colors.primary} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Attachments</Text>
-          {!mockFile ? (
-            <TouchableOpacity style={styles.uploadButton} onPress={handleUploadFile}>
-              <Feather name="upload-cloud" size={20} color={Theme.colors.primary} />
-              <Text style={styles.uploadButtonText}>Upload File</Text>
-            </TouchableOpacity>
+          <Text style={styles.label}>Assign To</Text>
+          {loading ? (
+            <ActivityIndicator
+              size="small"
+              color={Theme.colors.primary}
+              style={styles.loader}
+            />
           ) : (
-            <View style={styles.fileCard}>
-              <View style={styles.fileInfo}>
-                <Feather name="file-text" size={20} color={Theme.colors.textSecondary} />
-                <Text style={styles.fileName}>{mockFile.name}</Text>
-              </View>
-              <TouchableOpacity onPress={handleRemoveFile}>
-                <Feather name="trash-2" size={20} color={Theme.colors.error} />
+            <>
+              <TouchableOpacity
+                style={styles.selector}
+                onPress={() => setShowDropdown(!showDropdown)}
+              >
+                <Text
+                  style={[
+                    styles.selectorText,
+                    !assignedUser && styles.selectorPlaceholder,
+                  ]}
+                >
+                  {assignedUser ? assignedUser.name : "Select a member"}
+                </Text>
+                <Feather
+                  name={showDropdown ? "chevron-up" : "chevron-down"}
+                  size={20}
+                  color={Theme.colors.textSecondary}
+                />
               </TouchableOpacity>
-            </View>
+
+              {showDropdown && (
+                <View style={styles.dropdown}>
+                  <TouchableOpacity
+                    style={styles.dropdownOption}
+                    onPress={() => {
+                      setAssignedUser(null);
+                      setShowDropdown(false);
+                    }}
+                  >
+                    <Text style={styles.dropdownOptionText}>Unassigned</Text>
+                    {!assignedUser && (
+                      <Feather name="check" size={16} color={Theme.colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                  {projectMembers.map((member) => (
+                    <TouchableOpacity
+                      key={member.id}
+                      style={styles.dropdownOption}
+                      onPress={() => {
+                        setAssignedUser(member);
+                        setShowDropdown(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownOptionText,
+                          assignedUser?.id === member.id && styles.activeDropdownOptionText,
+                        ]}
+                      >
+                        {member.name}
+                      </Text>
+                      {assignedUser?.id === member.id && (
+                        <Feather name="check" size={16} color={Theme.colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
           )}
         </View>
 
-        <TouchableOpacity 
-          style={styles.submitButton} 
+        <TouchableOpacity
+          style={[
+            styles.submitButton,
+            isSubmitting && styles.submitButtonDisabled,
+          ]}
           activeOpacity={0.8}
           onPress={handleCreateTask}
-          disabled={loading}
+          disabled={isSubmitting}
         >
           <LinearGradient
             colors={Theme.colors.primaryGradient}
@@ -210,7 +221,7 @@ export default function CreateTask() {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            {loading ? (
+            {isSubmitting ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={styles.submitText}>Create Task</Text>
@@ -273,6 +284,9 @@ const styles = StyleSheet.create({
     height: 120,
     textAlignVertical: "top",
   },
+  loader: {
+    paddingVertical: Theme.spacing.md,
+  },
   selector: {
     flexDirection: "row",
     alignItems: "center",
@@ -286,6 +300,9 @@ const styles = StyleSheet.create({
   selectorText: {
     fontSize: 15,
     color: Theme.colors.text,
+  },
+  selectorPlaceholder: {
+    color: Theme.colors.textSecondary,
   },
   dropdown: {
     backgroundColor: Theme.colors.surface,
@@ -315,43 +332,6 @@ const styles = StyleSheet.create({
     color: Theme.colors.primary,
     fontWeight: "600",
   },
-  uploadButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    padding: Theme.spacing.md,
-    borderWidth: 1,
-    borderColor: Theme.colors.primary,
-    borderStyle: "dashed",
-    borderRadius: Theme.radius.md,
-    backgroundColor: "#EFF6FF",
-  },
-  uploadButtonText: {
-    color: Theme.colors.primary,
-    fontWeight: "600",
-    fontSize: 15,
-  },
-  fileCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: Theme.spacing.md,
-    backgroundColor: Theme.colors.background,
-    borderRadius: Theme.radius.md,
-    borderWidth: 1,
-    borderColor: Theme.colors.border,
-  },
-  fileInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  fileName: {
-    fontSize: 14,
-    color: Theme.colors.text,
-    fontWeight: "500",
-  },
   submitButton: {
     marginTop: Theme.spacing.xl,
     borderRadius: Theme.radius.lg,
@@ -361,6 +341,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 4,
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
   },
   gradient: {
     paddingVertical: 18,

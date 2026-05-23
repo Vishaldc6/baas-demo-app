@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   FlatList,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,117 +15,117 @@ import { Theme } from "../../constants/Theme";
 import { FirebaseProject } from "../../services/firebase";
 import { SupabaseProject } from "../../services/supabase";
 
-const MOCK_PROJECTS = [
-  {
-    id: "1",
-    name: "Brand Refresh",
-    description: "Revitalizing the visual identity with a modern palette and typography.",
-    members: 5,
-    color: "#3B82F6",
-  },
-  {
-    id: "2",
-    name: "Mobile App Design",
-    description: "Designing the core user flow and high-fidelity wireframes for iOS & Android.",
-    members: 3,
-    color: "#8B5CF6",
-  },
-  {
-    id: "3",
-    name: "Marketing Website",
-    description: "Building a high-conversion landing page with interactive product demos.",
-    members: 8,
-    color: "#10B981",
-  },
-  {
-    id: "4",
-    name: "SEO Optimization",
-    description: "Improving organic reach through technical SEO and content strategy.",
-    members: 2,
-    color: "#F59E0B",
-  },
-  {
-    id: "5",
-    name: "E-commerce Launch",
-    description: "Setting up the digital storefront and payment integration for the new collection.",
-    members: 12,
-    color: "#EF4444",
-  },
-];
-
 export default function Home() {
   const router = useRouter();
-  const { provider } = useAuth();
+  const { provider, user } = useAuth();
 
   const [projectList, setProjectList] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchAllProjects();
   }, []);
 
   async function fetchAllProjects() {
+    if (!provider || !user?.id) return;
     try {
       const data =
         provider === "firebase"
-          ? await FirebaseProject.getProjectList()
-          : await SupabaseProject.getProjectList();
-      console.log("fetchAllProjects: ", { data });
-
-      setProjectList(data as any[]);
+          ? await FirebaseProject.getProjectList(user.id)
+          : await SupabaseProject.getProjectList(user.id);
+      setProjectList(data || []);
     } catch (error) {
       console.log({ error });
     }
   }
 
-  const renderProjectCard = ({ item }: { item: (typeof projectList)[0] }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => router.push(`/project/${item.id}`)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.cardHeader}>
-        <View style={[styles.colorDot, { backgroundColor: item.color }]} />
-        <Text style={styles.cardTitle}>{item.name}</Text>
-      </View>
-      
-      <Text style={styles.cardDescription} numberOfLines={2}>
-        {item.description}
-      </Text>
-      
-      <View style={styles.cardFooter}>
-        <View style={styles.memberContainer}>
-          <View style={styles.avatarStack}>
-            {[1, 2, 3].map((i) => (
-              <View 
-                key={i} 
-                style={[
-                  styles.miniAvatar, 
-                  { marginLeft: i === 1 ? 0 : -8, zIndex: 5 - i }
-                ]} 
-              />
-            ))}
-          </View>
-          <Text style={styles.memberText}>{item.members?.length} members</Text>
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchAllProjects();
+    setRefreshing(false);
+  };
+
+  // TODO: Edit project (name, description, color, icon)
+  // TODO: Archive / unarchive project
+  // TODO: Delete project
+  // TODO: Invitation flow (email token, expiry, accept/decline)
+  // TODO: Activity log (timeline of actions)
+  // TODO: Project member operations (change role, remove, leave)
+
+  const renderProjectCard = ({ item }: { item: any }) => {
+    const maxAvatars = 3;
+    const displayMembers = item.members?.slice(0, maxAvatars) || [];
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => router.push(`/project/${item.id}`)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.cardHeader}>
+          <View style={[styles.colorDot, { backgroundColor: item.color || Theme.colors.primary }]} />
+          <Text style={styles.cardTitle}>{item.name}</Text>
         </View>
-        <Feather name="chevron-right" size={18} color={Theme.colors.textSecondary} />
-      </View>
-    </TouchableOpacity>
-  );
+
+        <Text style={styles.cardDescription} numberOfLines={2}>
+          {item.description || "No description"}
+        </Text>
+
+        <View style={styles.cardFooter}>
+          <View style={styles.memberContainer}>
+            <View style={styles.avatarStack}>
+              {displayMembers.map((m: any, i: number) => (
+                <Image
+                  key={m.id || m.user_id || i}
+                  source={{
+                    uri: m.avatar || `https://ui-avatars.com/api/?name=${m.name || "U"}&background=2563EB&color=fff&size=20`,
+                  }}
+                  style={[
+                    styles.miniAvatar,
+                    { marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i },
+                  ]}
+                />
+              ))}
+              {(item.members?.length || 0) > maxAvatars && (
+                <View style={[styles.miniAvatar, styles.miniAvatarMore, { marginLeft: -8 }]}>
+                  <Text style={styles.miniAvatarMoreText}>+{item.members.length - maxAvatars}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.memberText}>{item.members?.length || 0} members</Text>
+          </View>
+          <View style={styles.footerRight}>
+            <Text style={styles.taskCount}>{item.taskCount || 0} tasks</Text>
+            <Feather name="chevron-right" size={18} color={Theme.colors.textSecondary} />
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
       <FlatList
-        data={[...projectList, ...MOCK_PROJECTS]}
+        data={projectList}
         renderItem={renderProjectCard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={() => (
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Your Projects</Text>
             <Text style={styles.headerSubtitle}>
-              You have {[...projectList, ...MOCK_PROJECTS].length} active projects
+              You have {projectList.length} active project{projectList.length !== 1 ? "s" : ""}
             </Text>
+          </View>
+        )}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Feather name="folder" size={48} color={Theme.colors.border} />
+            <Text style={styles.emptyText}>No projects yet</Text>
+            <Text style={styles.emptySubtext}>Tap + to create your first project</Text>
           </View>
         )}
       />
@@ -224,17 +225,52 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   miniAvatar: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#E5E7EB",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: Theme.colors.surface,
+    backgroundColor: "#E5E7EB",
+  },
+  miniAvatarMore: {
+    backgroundColor: Theme.colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  miniAvatarMoreText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "700",
   },
   memberText: {
     fontSize: 13,
     fontWeight: "500",
     color: Theme.colors.textSecondary,
+  },
+  footerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  taskCount: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: Theme.colors.textSecondary,
+  },
+  emptyContainer: {
+    alignItems: "center",
+    paddingTop: 80,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Theme.colors.textSecondary,
+    marginTop: Theme.spacing.md,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+    marginTop: 4,
   },
   fab: {
     position: "absolute",

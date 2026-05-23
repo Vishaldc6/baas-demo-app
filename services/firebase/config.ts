@@ -26,3 +26,5 @@ export const db = getFirestore(app);
 export const userRef = collection(db, 'profiles');
 export const projectRef = collection(db, 'projects');
 export const projectMembersRef = collection(db, 'project_members');
+export const tasksRef = collection(db, 'tasks');
+export const messagesRef = collection(db, 'messages');

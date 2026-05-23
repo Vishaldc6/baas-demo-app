@@ -1,30 +1,80 @@
 import supabase from "./config";
 
-export const getProjectList = async () => {
+export const getProjectList = async (userId: string) => {
+  if (!userId) return [];
 
-  // -- PENDING -- 
-  // associate projects only
+  // fetch project ids with associated project members
+  const { data: userMemberships, error: membershipError } = await supabase
+    .from("project_members")
+    .select("project_id")
+    .eq("user_id", userId);
 
-  // fetch project ids from project_members
-  // fetch projects based on fetched ids
+  console.log('fetch project ids with associated project members :', { userMemberships, membershipError });
 
+  if (membershipError) throw new Error(membershipError.message);
+  if (!userMemberships?.length) return [];
+
+  const projectIds = userMemberships.map((pm: any) => pm.project_id);
+
+  // fetch projects data as per project ids
   const { data: projects, error: projectError } = await supabase
     .from("projects")
-    .select("*");
-  console.log({ projects, projectError });
+    .select("*")
+    .in("id", projectIds);
 
-  const { data: projectMembers, error: projectMembersError } = await supabase.from('project_members')
-    .select('*')
-    .in('project_id', (projects || []).map((p: any) => p.id));
-  console.log({ projectMembers, projectMembersError });
+  console.log('fetch projects data as per project ids :', { projects, projectError });
+
+  if (projectError) throw new Error(projectError.message);
+
+  // fetch project members as per project ids
+  const { data: projectMembers, error: membersError } = await supabase
+    .from("project_members")
+    .select("project_id, user_id, role")
+    .in("project_id", projectIds);
+
+  if (membersError) throw new Error(membersError.message);
+
+  // fetch total task counts as per project ids 
+  const { data: taskCounts, error: tasksError } = await supabase
+    .from("tasks")
+    .select("project_id, id")
+    .in("project_id", projectIds);
+
+  console.log('fetch total task counts as per project ids : ', { taskCounts, tasksError });
+
+  if (tasksError) throw new Error(tasksError.message);
+
+  const taskCountMap: Record<string, number> = {};
+  for (const t of taskCounts || []) {
+    taskCountMap[t.project_id] = (taskCountMap[t.project_id] || 0) + 1;
+  }
 
   const projectsWithMembers = projects?.map((p: any) => {
     const members = projectMembers?.filter((pm: any) => pm.project_id === p.id);
-    return { ...p, members };
+    return { ...p, members, taskCount: taskCountMap[p.id] || 0 };
   });
 
-  return projectsWithMembers
-}
+  // TODO: Edit project (update name, description, color, icon) — use updateProject(projectId, data)
+  // TODO: Archive / unarchive project (toggle is_archived field)
+  // TODO: Delete project (cascade to project_members, tasks, messages, invitations, activity_log)
+  // TODO: Invitation flow with email token, expiry, accept/decline
+  // TODO: Activity log insertion on project actions
+
+  console.log('projectsWithMembers: ', { projectsWithMembers });
+
+  return projectsWithMembers;
+};
+
+export const getProjectById = async (projectId: string) => {
+  const { data: project, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("id", projectId)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return project;
+};
 
 export const createProject = async (
   userId: string,

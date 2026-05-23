@@ -37,25 +37,15 @@ export default function SignIn() {
 
     setIsSubmitting(true);
 
-    // Simulate network request
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
     try {
       await signIn(email, password);
     } catch (err: any) {
       console.log(err);
       setError(err?.message || "An error occurred during sign in.");
     } finally {
-      if (mounted) setIsSubmitting(false); // In a real app handle unmounting properly
+      setIsSubmitting(false);
     }
   };
-
-  let mounted = true;
-  React.useEffect(() => {
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   return (
     <KeyboardAvoidingView

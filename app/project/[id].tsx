@@ -1,8 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -13,135 +14,89 @@ import {
 } from "react-native";
 
 import { AddMembersModal } from "../../components/AddMembersModal";
+import { ProfileSheet } from "../../components/ProfileSheet";
 import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
 
-import { FirebaseProject } from "../../services/firebase";
+import { FirebaseProject, FirebaseTask } from "../../services/firebase";
 import {
   SupabaseProject,
   SupabaseProjectMembers,
   SupabaseTask,
 } from "../../services/supabase";
 
-const isOwner = true; // Static role flag as requested
-
-const MOCK_MEMBERS = [
-  {
-    id: "1",
-    name: "Alex Rivera",
-    avatar: "https://i.pravatar.cc/150?u=alex",
-    role: "member",
-  },
-  {
-    id: "2",
-    name: "Sarah Chen",
-    avatar: "https://i.pravatar.cc/150?u=sarah",
-    role: "member",
-  },
-  {
-    id: "3",
-    name: "Mike Ross",
-    avatar: "https://i.pravatar.cc/150?u=mike",
-    role: "member",
-  },
-];
-
-const MOCK_TASKS = [
-  { 
-    id: "1", 
-    title: "Review brand colors", 
-    status: "Completed", 
-    assignee: MOCK_MEMBERS[0],
-    hasAttachment: true,
-  },
-  { 
-    id: "2", 
-    title: "Create logo variants", 
-    status: "In Progress", 
-    assignee: MOCK_MEMBERS[1],
-    hasAttachment: false,
-  },
-  { 
-    id: "3", 
-    title: "Design homepage layout", 
-    status: "To Do", 
-    assignee: MOCK_MEMBERS[2],
-    hasAttachment: true,
-  },
-  { 
-    id: "4", 
-    title: "Mobile responsive check", 
-    status: "To Do", 
-    assignee: MOCK_MEMBERS[0],
-    hasAttachment: false,
-  },
-  { 
-    id: "5", 
-    title: "Feedback session with client", 
-    status: "To Do", 
-    assignee: MOCK_MEMBERS[1],
-    hasAttachment: true,
-  },
-  { 
-    id: "6", 
-    title: "Finalize typography", 
-    status: "To Do", 
-    assignee: MOCK_MEMBERS[2],
-    hasAttachment: false,
-  },
-];
-
 export default function ProjectDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { provider } = useAuth();
-  
+  const { provider, user } = useAuth();
+
   const [activeTab, setActiveTab] = useState("Tasks");
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [tasks, setTasks] = useState<any[]>(MOCK_TASKS);
-  const [members, setMembers] = useState<any[]>(MOCK_MEMBERS);
-  const [loading, setLoading] = useState(false);
+  const [isAddMemberModalVisible, setIsAddMemberModalVisible] = useState(false);
+  const [profileSheetUserId, setProfileSheetUserId] = useState<string | null>(null);
+  const [project, setProject] = useState<any>(null);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
+  const [isOwner, setIsOwner] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-      setLoading(true);
-      try {
-        if (provider === "supabase") {
-          // Fetch Tasks
-          const fetchedTasks = await SupabaseTask.getTasksByProject(id as string);
-          
-          // Fetch Members
-          const fetchedMembers = await SupabaseProjectMembers.getProjectMembers(
-            id as string,
-          );
-          setTasks([...fetchedTasks, ...MOCK_TASKS]);
-          setMembers([...fetchedMembers, ...MOCK_MEMBERS]);
-        }
-        if (provider === "firebase") { }
-      } catch (error) {
-        console.error("Failed to fetch project data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadData();
   }, [id, provider]);
 
-  const handleAddMembers = async (members: any[]) => {
+  const loadData = async () => {
+    if (!id || !provider || !user?.id) return;
+    setLoading(true);
+    try {
+      const projectId = id as string;
+      if (provider === "supabase") {
+        const [projectData, fetchedTasks, fetchedMembers, role] = await Promise.all([
+          SupabaseProject.getProjectById(projectId),
+          SupabaseTask.getTasksByProject(projectId),
+          SupabaseProjectMembers.getProjectMembers(projectId),
+          SupabaseProjectMembers.getCurrentUserRole(projectId, user.id),
+        ]);
+        setProject(projectData);
+        setTasks(fetchedTasks || []);
+        setMembers(fetchedMembers || []);
+        setIsOwner(role === "owner");
+      }
+
+      if (provider === "firebase") {
+        const [projectData, fetchedTasks, fetchedMembers, role] = await Promise.all([
+          FirebaseProject.getProjectById(projectId),
+          FirebaseTask.getTasksByProject(projectId),
+          FirebaseProject.getProjectMembers(projectId),
+          FirebaseProject.getCurrentUserRole(projectId, user.id),
+        ]);
+        setProject(projectData);
+        setTasks(fetchedTasks || []);
+        setMembers(fetchedMembers || []);
+        setIsOwner(role === "owner");
+      }
+    } catch (error) {
+      console.error("Failed to fetch project data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const membersMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    for (const m of members) {
+      map[m.id] = m;
+    }
+    return map;
+  }, [members]);
+
+  const handleAddMembers = async (newMembers: any[]) => {
     try {
       if (provider === "firebase") {
-        await FirebaseProject.addMembersToProject(id as string, members);
-        Alert.alert("Success", "Members added successfully!");
-        // Refresh project members here if pulling dynamically
+        await FirebaseProject.addMembersToProject(id as string, newMembers);
       } else if (provider === "supabase") {
-        await SupabaseProject.addMembersToProject(id as string, members);
-        Alert.alert("Success", "Members added successfully!");
-        // Refresh project members here if pulling dynamically
-      } else {
-        Alert.alert("Error", "No provider selected");
+        await SupabaseProject.addMembersToProject(id as string, newMembers);
       }
+      Alert.alert("Success", "Members added successfully!");
+      loadData();
     } catch (error: any) {
       console.error(error);
       Alert.alert("Error", error.message || "Failed to add members");
@@ -150,48 +105,81 @@ export default function ProjectDetails() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Completed": return "#10B981";
-      case "In Progress": return "#3B82F6";
-      default: return "#6B7280";
+      case "completed":
+      case "Completed":
+        return "#10B981";
+      case "in_progress":
+      case "In Progress":
+        return "#3B82F6";
+      default:
+        return "#6B7280";
     }
   };
 
-  const renderTaskItem = ({ item }: { item: typeof MOCK_TASKS[0] }) => (
-    <View style={styles.taskCard}>
-      <View style={styles.taskMain}>
-        <View style={styles.titleRow}>
-          <Text style={[
-            styles.taskTitle,
-            item.status === "Completed" && styles.completedTaskTitle
-          ]}>
-            {item.title}
-          </Text>
-          {item.hasAttachment && (
-            <Feather name="paperclip" size={14} color={Theme.colors.textSecondary} style={styles.attachmentIcon} />
-          )}
-        </View>
-        <View style={styles.taskMeta}>
-          <Image source={{ uri: item.assignee?.avatar }} style={styles.assigneeAvatar} />
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + "15" }]}>
-            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>{item.status}</Text>
+  const getAssigneeName = (assigneeId: string) => {
+    const member = membersMap[assigneeId];
+    return member?.name || assigneeId || "U";
+  };
+
+  const renderTaskItem = ({ item }: { item: any }) => {
+    const assigneeName = getAssigneeName(item.assignee_id);
+    return (
+      <TouchableOpacity style={styles.taskCard} activeOpacity={0.7}>
+        <View style={styles.taskMain}>
+          <View style={styles.titleRow}>
+            <Text
+              style={[
+                styles.taskTitle,
+                item.status === "Completed" && styles.completedTaskTitle,
+              ]}
+            >
+              {item.title}
+            </Text>
+          </View>
+          <View style={styles.taskMeta}>
+            <Image
+              source={{ uri: `https://ui-avatars.com/api/?name=${assigneeName}&background=2563EB&color=fff&size=24` }}
+              style={styles.assigneeAvatar}
+            />
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: getStatusColor(item.status) + "15" },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusText,
+                  { color: getStatusColor(item.status) },
+                ]}
+              >
+                {item.status || "todo"}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
-      <TouchableOpacity>
         <Feather name="more-horizontal" size={20} color={Theme.colors.textSecondary} />
       </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
-  const renderMemberItem = ({ item }: { item: typeof MOCK_MEMBERS[0] }) => (
+  const renderMemberItem = ({ item }: { item: any }) => (
     <View style={styles.memberCard}>
-      <Image source={{ uri: item.avatar }} style={styles.memberAvatar} />
+      <Image
+        source={{
+          uri: item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || "U")}&background=2563EB&color=fff&size=96`,
+        }}
+        style={styles.memberAvatar}
+      />
       <View style={styles.memberInfo}>
         <Text style={styles.memberName}>{item.name}</Text>
         <Text style={styles.memberRole}>{item.role}</Text>
       </View>
-      <TouchableOpacity style={styles.messageButton}>
-        <Feather name="message-square" size={18} color={Theme.colors.primary} />
+      <TouchableOpacity
+        style={styles.messageButton}
+        onPress={() => setProfileSheetUserId(item.id)}
+      >
+        <Feather name="user" size={18} color={Theme.colors.primary} />
       </TouchableOpacity>
     </View>
   );
@@ -199,60 +187,100 @@ export default function ProjectDetails() {
   return (
     <View style={styles.container}>
       <View style={styles.navHeader}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
           <Feather name="arrow-left" size={24} color={Theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.navTitle}>Project Details</Text>
-        <TouchableOpacity style={styles.moreButton}>
-          <Feather name="settings" size={22} color={Theme.colors.text} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerActionButton}
+            onPress={() => router.push(`/chat/${id}`)}
+          >
+            <Feather name="message-circle" size={22} color={Theme.colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerActionButton}>
+            <Feather name="settings" size={22} color={Theme.colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <FlatList
-        data={activeTab === "Tasks" ? tasks : members}
-        renderItem={activeTab === "Tasks" ? renderTaskItem : renderMemberItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.content}
-        ListHeaderComponent={() => (
-          <View style={styles.projectInfo}>
-            <View style={styles.projectNameRow}>
-              <Text style={styles.projectName}>Project {id || "Details"}</Text>
-              {isOwner && activeTab === "Members" && (
-                <TouchableOpacity 
-                  style={styles.addMemberButton}
-                  onPress={() => setIsModalVisible(true)}
-                >
-                  <Feather name="user-plus" size={18} color={Theme.colors.primary} />
-                  <Text style={styles.addMemberText}>Add Member</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <Text style={styles.projectDesc}>
-              This is a centralized hub for managing tasks, tracking progress, 
-              and collaborating with team members on the current project.
-            </Text>
-            
-            <View style={styles.tabRow}>
-              {["Tasks", "Members"].map((tab) => (
-                <TouchableOpacity 
-                  key={tab}
-                  style={[styles.tab, activeTab === tab && styles.activeTab]}
-                  onPress={() => setActiveTab(tab)}
-                >
-                  <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                    {tab}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Theme.colors.primary} />
+        </View>
+      ) : (
+        /* TODO: When member/status filter is active, replace `tasks` with a filtered copy (useMemo) derived from raw `tasks`. Do not refetch from API. */
+        <FlatList
+          data={activeTab === "Tasks" ? tasks : members}
+          renderItem={activeTab === "Tasks" ? renderTaskItem : renderMemberItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.content}
+          ListHeaderComponent={() => (
+            <View style={styles.projectInfo}>
+              <View style={styles.projectNameRow}>
+                <Text style={styles.projectName}>{project?.name || `Project ${id}`}</Text>
+              </View>
+              <Text style={styles.projectDesc}>
+                {project?.description || "No description"}
+              </Text>
 
-      {(isOwner || activeTab === "Tasks") && activeTab === "Tasks" && (
+              <View style={styles.statsRow}>
+                {project && (
+                  <>
+                    <View style={styles.stat}>
+                      <Text style={styles.statValue}>{members.length}</Text>
+                      <Text style={styles.statLabel}>Members</Text>
+                    </View>
+                    <View style={styles.stat}>
+                      <Text style={styles.statValue}>{tasks.length}</Text>
+                      <Text style={styles.statLabel}>Tasks</Text>
+                    </View>
+                  </>
+                )}
+              </View>
+
+              <View style={styles.tabRow}>
+                {["Tasks", "Members"].map((tab) => (
+                  <TouchableOpacity
+                    key={tab}
+                    style={[styles.tab, activeTab === tab && styles.activeTab]}
+                    onPress={() => setActiveTab(tab)}
+                  >
+                    <Text
+                      style={[
+                        styles.tabText,
+                        activeTab === tab && styles.activeTabText,
+                      ]}
+                    >
+                      {tab}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {/* TODO: Add filter row below tasks tab — chips for "All Tasks" / "My Tasks" (filter by current user's member id) + status filter (All / To Do / In Progress / Done). Filter should re-render FlatList data without extra API call. */}
+            </View>
+          )}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {activeTab === "Tasks" ? "No tasks yet" : "No members"}
+              </Text>
+            </View>
+          )}
+        />
+      )}
+
+      {isOwner && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => router.push(`/task/create?projectId=${id}`)}
+          onPress={() =>
+            activeTab === "Tasks"
+              ? router.push(`/task/create?projectId=${id}`)
+              : setIsAddMemberModalVisible(true)
+          }
           activeOpacity={0.9}
         >
           <LinearGradient
@@ -261,16 +289,28 @@ export default function ProjectDetails() {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Feather name="plus" size={24} color="#FFFFFF" />
-            <Text style={styles.fabText}>Create Task</Text>
+            <Feather
+              name={activeTab === "Tasks" ? "plus" : "user-plus"}
+              size={24}
+              color={"#FFFFFF"}
+            />
+            <Text style={styles.fabText}>
+              {activeTab === "Tasks" ? "Create Task" : "Add Member"}
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
       )}
 
       <AddMembersModal
-        visible={isModalVisible}
-        onClose={() => setIsModalVisible(false)}
+        visible={isAddMemberModalVisible}
+        onClose={() => setIsAddMemberModalVisible(false)}
         onAddMembers={handleAddMembers}
+      />
+
+      <ProfileSheet
+        visible={!!profileSheetUserId}
+        userId={profileSheetUserId || ""}
+        onClose={() => setProfileSheetUserId(null)}
       />
     </View>
   );
@@ -301,11 +341,21 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: Theme.colors.text,
   },
-  moreButton: {
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  headerActionButton: {
     width: 40,
     height: 40,
     alignItems: "center",
     justifyContent: "center",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   content: {
     paddingBottom: 120,
@@ -329,25 +379,30 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: Theme.colors.text,
   },
-  addMemberButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Theme.radius.md,
-    backgroundColor: "#EFF6FF",
-  },
-  addMemberText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Theme.colors.primary,
-  },
   projectDesc: {
     fontSize: 15,
     color: Theme.colors.textSecondary,
     lineHeight: 22,
-    marginBottom: Theme.spacing.xl,
+    marginBottom: Theme.spacing.lg,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: Theme.spacing.xl,
+    marginBottom: Theme.spacing.lg,
+  },
+  stat: {
+    alignItems: "center",
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: Theme.colors.text,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+    fontWeight: "600",
+    textTransform: "uppercase",
   },
   tabRow: {
     flexDirection: "row",
@@ -389,9 +444,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: Theme.colors.text,
-  },
-  attachmentIcon: {
-    marginLeft: 8,
   },
   completedTaskTitle: {
     textDecorationLine: "line-through",
@@ -451,6 +503,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFF6FF",
     alignItems: "center",
     justifyContent: "center",
+  },
+  emptyContainer: {
+    padding: Theme.spacing.xl,
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 16,
+    color: Theme.colors.textSecondary,
   },
   fab: {
     position: "absolute",

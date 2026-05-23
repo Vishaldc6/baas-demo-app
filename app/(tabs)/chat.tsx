@@ -1,93 +1,147 @@
 import { Feather } from "@expo/vector-icons";
-import React from "react";
+import { useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
+import { FirebaseChat } from "../../services/firebase";
+import { SupabaseChat } from "../../services/supabase";
 
-const MOCK_CHATS = [
-  {
-    id: "1",
-    name: "Alex Rivera",
-    lastMessage: "I've uploaded the latest design files for review.",
-    time: "2m ago",
-    unread: 2,
-    avatar: "https://i.pravatar.cc/150?u=alex",
-  },
-  {
-    id: "2",
-    name: "Project Alpha Team",
-    lastMessage: "Sarah: Let's sync on the marketing strategy tomorrow.",
-    time: "15m ago",
-    unread: 0,
-    avatar: "https://i.pravatar.cc/150?u=alpha",
-  },
-  {
-    id: "3",
-    name: "Jordan Smith",
-    lastMessage: "The SEO report is looking great. Good job!",
-    time: "1h ago",
-    unread: 0,
-    avatar: "https://i.pravatar.cc/150?u=jordan",
-  },
-  {
-    id: "4",
-    name: "Design System Group",
-    lastMessage: "Mike: We need to update the button variants.",
-    time: "3h ago",
-    unread: 5,
-    avatar: "https://i.pravatar.cc/150?u=design",
-  },
-];
+function formatTime(dateStr: string | null) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "Now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
 
 export default function ChatList() {
   const router = useRouter();
+  const { provider, user } = useAuth();
+  const [chats, setChats] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const renderChatItem = ({ item }: { item: typeof MOCK_CHATS[0] }) => (
-    <TouchableOpacity 
-      style={styles.chatItem} 
+  const loadChats = useCallback(async () => {
+    if (!user?.id || !provider) return;
+    try {
+      setError(null);
+      let data: any[] = [];
+      if (provider === "firebase") {
+        data = await FirebaseChat.getUserProjectsWithLatestMessage(user.id);
+      } else if (provider === "supabase") {
+        data = await SupabaseChat.getUserProjectsWithLatestMessage(user.id);
+      }
+      // Only show projects that have at least one message (active rooms)
+      const activeChats = (data || []).filter((chat: any) => chat.latestMessage !== null);
+      setChats(activeChats);
+    } catch (err: any) {
+      console.error("Failed to load chats:", err);
+      setError(err.message || "Failed to load chats");
+    }
+  }, [user?.id, provider]);
+
+  React.useEffect(() => {
+    setLoading(true);
+    loadChats().finally(() => setLoading(false));
+  }, [loadChats]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadChats();
+    setRefreshing(false);
+  }, [loadChats]);
+
+  const renderChatItem = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.chatItem}
       activeOpacity={0.6}
       onPress={() => router.push(`/chat/${item.id}`)}
     >
-      <Image source={{ uri: item.avatar }} style={styles.avatar} />
+      <Image
+        source={{
+          uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || "P")}&background=2563EB&color=fff&size=104`,
+        }}
+        style={styles.avatar}
+      />
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
-          <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.time}>{item.time}</Text>
+          <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+          {item.latestMessage && (
+            <Text style={styles.time}>{formatTime(item.latestMessage.createdAt)}</Text>
+          )}
         </View>
         <View style={styles.messageRow}>
           <Text style={styles.lastMessage} numberOfLines={1}>
-            {item.lastMessage}
+            {item.latestMessage
+              ? `${item.latestMessage.senderName ? item.latestMessage.senderName + ": " : ""}${item.latestMessage.text}`
+              : "No messages yet"}
           </Text>
-          {item.unread > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{item.unread}</Text>
-            </View>
-          )}
         </View>
       </View>
     </TouchableOpacity>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={Theme.colors.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centerContainer}>
+        <Feather name="alert-circle" size={48} color={Theme.colors.error} />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadChats}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={MOCK_CHATS}
+        data={chats}
         renderItem={renderChatItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={chats.length === 0 ? styles.emptyListContent : styles.listContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Theme.colors.primary} />
+        }
         ListHeaderComponent={() => (
           <View style={styles.header}>
             <View style={styles.searchBar}>
               <Feather name="search" size={18} color={Theme.colors.textSecondary} />
               <Text style={styles.searchPlaceholder}>Search messages...</Text>
             </View>
+          </View>
+        )}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Feather name="message-square" size={48} color={Theme.colors.textSecondary} />
+            <Text style={styles.emptyTitle}>No chats yet</Text>
+            <Text style={styles.emptySubtitle}>Your project conversations will appear here</Text>
           </View>
         )}
       />
@@ -100,7 +154,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Theme.colors.background,
   },
+  centerContainer: {
+    flex: 1,
+    backgroundColor: Theme.colors.background,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Theme.spacing.xl,
+  },
   listContent: {
+    paddingBottom: 24,
+  },
+  emptyListContent: {
+    flexGrow: 1,
     paddingBottom: 24,
   },
   header: {
@@ -133,6 +198,7 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 26,
     marginRight: Theme.spacing.md,
+    backgroundColor: "#F3F4F6",
   },
   chatInfo: {
     flex: 1,
@@ -147,6 +213,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: Theme.colors.text,
+    flex: 1,
+    marginRight: Theme.spacing.sm,
   },
   time: {
     fontSize: 12,
@@ -163,18 +231,40 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: Theme.spacing.md,
   },
-  unreadBadge: {
-    backgroundColor: Theme.colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 20,
-    alignItems: "center",
+  emptyContainer: {
+    flex: 1,
     justifyContent: "center",
+    alignItems: "center",
+    padding: Theme.spacing.xl,
   },
-  unreadText: {
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Theme.colors.text,
+    marginTop: Theme.spacing.md,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: Theme.colors.textSecondary,
+    marginTop: Theme.spacing.sm,
+    textAlign: "center",
+  },
+  errorText: {
+    fontSize: 16,
+    color: Theme.colors.textSecondary,
+    marginTop: Theme.spacing.md,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: Theme.spacing.lg,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    backgroundColor: Theme.colors.primary,
+    borderRadius: Theme.radius.md,
+  },
+  retryText: {
     color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "bold",
+    fontWeight: "700",
+    fontSize: 14,
   },
 });

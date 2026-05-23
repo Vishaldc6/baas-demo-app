@@ -42,25 +42,15 @@ export default function SignUp() {
 
     setIsSubmitting(true);
 
-    // Simulate network request
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
     try {
       await signUp(email, password);
     } catch (err: any) {
       console.log(err);
       setError(err?.message || "An error occurred during registration.");
     } finally {
-      if (mounted) setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
-
-  let mounted = true;
-  React.useEffect(() => {
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   return (
     <KeyboardAvoidingView

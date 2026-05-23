@@ -7,10 +7,6 @@ import { doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/fi
 import { auth, userRef } from "./config";
 
 export const signIn = async (email: string, password?: string) => {
-  // Simulate network request
-  await new Promise((resolve) => setTimeout(resolve, 1500));
-
-  // Real implementation:
   const userCredential = await signInWithEmailAndPassword(
     auth,
     email,
@@ -32,22 +28,18 @@ const checkUsernameExists = async (username: string) => {
 };
 
 export const signUp = async (email: string, password?: string) => {
-  // Simulate network request
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  const username = email.split('@')[0];
+  const userExists = await checkUsernameExists(username);
+  if (userExists) {
+    throw new Error("Username already exists.");
+  }
 
-  // Real implementation:
   const userCredential = await createUserWithEmailAndPassword(
     auth,
     email,
     password || "",
   );
   console.log(`[Firebase] Signed up user: ${email}`, { userCredential });
-  const username = email.split('@')[0];
-  // const userExists = await checkUsernameExists(username);
-  // if (userExists) {
-  //   throw new Error("Username already exists.");
-  // }
-
   const uid = userCredential.user.uid;
   await setDoc(doc(userRef, uid), {
     id: uid,
@@ -60,10 +52,6 @@ export const signUp = async (email: string, password?: string) => {
 };
 
 export const signOut = async () => {
-  // Simulate network request
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  // Real implementation:
   await fbSignOut(auth);
 
   console.log(`[Firebase] Signed out user`);
