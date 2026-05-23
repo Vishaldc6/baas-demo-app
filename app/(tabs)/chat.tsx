@@ -38,6 +38,7 @@ export default function ChatList() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [indicators, setIndicators] = useState<{ [key: string]: boolean }>({});
 
   const loadChats = useCallback(async () => {
     if (!user?.id || !provider) return;
@@ -52,6 +53,13 @@ export default function ChatList() {
       // Only show projects that have at least one message (active rooms)
       const activeChats = (data || []).filter((chat: any) => chat.latestMessage !== null);
       setChats(activeChats);
+
+      // Initialize indicators for all chats (set to false by default)
+      const newIndicators: { [key: string]: boolean } = {};
+      activeChats.forEach((chat: any) => {
+        newIndicators[chat.id] = false;
+      });
+      setIndicators(newIndicators);
     } catch (err: any) {
       console.error("Failed to load chats:", err);
       setError(err.message || "Failed to load chats");
@@ -69,18 +77,28 @@ export default function ChatList() {
     setRefreshing(false);
   }, [loadChats]);
 
+  const toggleIndicator = (chatId: string) => {
+    setIndicators((prev) => ({
+      ...prev,
+      [chatId]: !prev[chatId],
+    }));
+  };
+
   const renderChatItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.chatItem}
       activeOpacity={0.6}
       onPress={() => router.push(`/chat/${item.id}`)}
     >
-      <Image
-        source={{
-          uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || "P")}&background=2563EB&color=fff&size=104`,
-        }}
-        style={styles.avatar}
-      />
+      <View style={styles.avatarContainer}>
+        <Image
+          source={{
+            uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || "P")}&background=2563EB&color=fff&size=104`,
+          }}
+          style={styles.avatar}
+        />
+        {indicators[item.id] && <View style={styles.indicator} />}
+      </View>
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
           <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
@@ -199,6 +217,20 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     marginRight: Theme.spacing.md,
     backgroundColor: "#F3F4F6",
+  },
+  avatarContainer: {
+    position: "relative",
+  },
+  indicator: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#10B981",
+    borderWidth: 2,
+    borderColor: Theme.colors.surface,
   },
   chatInfo: {
     flex: 1,
