@@ -9,14 +9,41 @@ export interface ProfileData {
   id: string;
   username: string;
   avatar_url: string | null;
-  created_at: any;
-  updated_at: any;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UpdateProfileData {
   username?: string;
   avatar_url?: string;
 }
+
+/**
+ * Helper to convert Firestore timestamps (or serialized timestamps) to ISO strings.
+ */
+const convertTimestamps = (data: any): ProfileData => {
+  if (!data) return data;
+  const result = { ...data };
+  
+  const parseDate = (val: any): string => {
+    if (!val) return new Date().toISOString();
+    if (typeof val.toDate === "function") {
+      return val.toDate().toISOString();
+    }
+    if (typeof val === "object" && typeof val.seconds === "number") {
+      return new Date(val.seconds * 1000).toISOString();
+    }
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString();
+    }
+    return new Date().toISOString();
+  };
+
+  if (result.created_at) result.created_at = parseDate(result.created_at);
+  if (result.updated_at) result.updated_at = parseDate(result.updated_at);
+  return result as ProfileData;
+};
 
 /**
  * Fetch a user's profile from Firestore.
@@ -30,7 +57,7 @@ export const getProfile = async (userId: string): Promise<ProfileData> => {
     throw new Error("Profile not found");
   }
 
-  return { id: snapshot.id, ...snapshot.data() } as ProfileData;
+  return convertTimestamps({ id: snapshot.id, ...snapshot.data() });
 };
 
 /**

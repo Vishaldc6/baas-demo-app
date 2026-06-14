@@ -29,11 +29,11 @@ export default function Profile() {
   const [username, setUsername] = useState(user?.username ?? "");
   console.log({ user });
 
-  const avatarUri =
-    user?.avatar_url ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(
-      user?.username || "U",
-    )}&background=2563EB&color=fff&size=200`;
+  const avatarUri = user?.avatar_url
+    ? `${user.avatar_url}?t=${user.updated_at ? new Date(user.updated_at).getTime() : Date.now()}`
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+        user?.username || "U",
+      )}&background=2563EB&color=fff&size=200`;
 
   const handlePickAvatar = async () => {
     if (!provider || !user?.id) return;

@@ -51,11 +51,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isReady || !segments) return;
 
-    const inAuthGroup = segments[0] === "(auth)";
-    const inTabsGroup = segments[0] === "(tabs)";
+    const pathSegments = segments as string[];
+    const inAuthGroup = pathSegments[0] === "(auth)";
+    const inTabsGroup = pathSegments[0] === "(tabs)";
     const isRoot =
-      segments.length === 0 ||
-      (segments.length === 1 && segments[0] === "index");
+      pathSegments.length === 0 ||
+      (pathSegments.length === 1 && pathSegments[0] === "index");
 
     if (!user && inTabsGroup) {
       router.replace(provider ? "/(auth)/sign-in" : "/");

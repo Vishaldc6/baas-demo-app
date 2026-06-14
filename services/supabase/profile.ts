@@ -53,6 +53,26 @@ export const updateProfile = async (
 };
 
 /**
+ * Reads a local file URI (e.g. from Image Picker) as an ArrayBuffer using XMLHttpRequest.
+ * This is fully compatible with React Native's JS environment on both iOS and Android.
+ */
+const getLocalFileArrayBuffer = (uri: string): Promise<ArrayBuffer> => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+      resolve(xhr.response);
+    };
+    xhr.onerror = function (e) {
+      console.error("Local file read via XHR failed:", e);
+      reject(new Error("Failed to read local file"));
+    };
+    xhr.responseType = "arraybuffer";
+    xhr.open("GET", uri, true);
+    xhr.send(null);
+  });
+};
+
+/**
  * Upload an avatar image to Supabase Storage and update the profile's avatar_url.
  *
  * @param userId - The user's ID (used as folder name in storage)
@@ -72,14 +92,13 @@ export const uploadAvatar = async (
   const fileName = `avatar.${ext}`;
   const filePath = `${userId}/${fileName}`;
 
-  // Read the file as a blob for upload
-  const response = await fetch(fileUri);
-  const blob = await response.blob();
+  // Read the file as an ArrayBuffer for robust upload on React Native
+  const arrayBuffer = await getLocalFileArrayBuffer(fileUri);
 
   // Upload to the "avatars" bucket (upsert to overwrite previous avatar)
   const { error: uploadError } = await supabase.storage
     .from("avatars")
-    .upload(filePath, blob, {
+    .upload(filePath, arrayBuffer, {
       contentType: `image/${ext}`,
       upsert: true,
     });
