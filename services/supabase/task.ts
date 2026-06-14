@@ -6,7 +6,7 @@ export interface TaskData {
   description?: string;
   status?: string;
   priority?: string;
-  assignee_id?: string;
+  assignee_id?: string | null;
   created_by: string;
   due_date?: string;
   position?: number;
@@ -102,7 +102,7 @@ export const getTasksByProject = async (projectId: string) => {
     .from("tasks")
     .select("*")
     .eq("project_id", projectId)
-    .order("position", { ascending: true });
+    .order("created_at", { ascending: true });
 
   if (error) {
     throw new Error(error.message);
@@ -114,7 +114,7 @@ export const getTasksByProject = async (projectId: string) => {
 export const getTasksByAssignee = async (assigneeId: string) => {
   const { data, error } = await supabase
     .from("tasks")
-    .select("*")
+    .select("*, projects(name)")
     .eq("assignee_id", assigneeId)
     .order("position", { ascending: true });
 
@@ -122,5 +122,8 @@ export const getTasksByAssignee = async (assigneeId: string) => {
     throw new Error(error.message);
   }
 
-  return data;
+  return data.map((task: any) => ({
+    ...task,
+    project_name: task.projects?.name || "Unknown Project",
+  }));
 };

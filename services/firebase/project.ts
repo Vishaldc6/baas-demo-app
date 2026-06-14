@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
+import { collection, doc, documentId, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
 import { db, projectMembersRef, tasksRef, userRef } from "./config";
 
 const checkMembershipExists = async (projectId: string, userId: string) => {
@@ -46,7 +46,12 @@ export const getProjectList = async (userId: string) => {
     // TODO: Invitation flow with email token, expiry, accept/decline
     // TODO: Activity log insertion on project actions
 
-    return projects.filter(Boolean);
+    // Sort by created_at (newest first)
+    return projects.filter(Boolean).sort((a: any, b: any) => {
+        const aTime = a.created_at?.toMillis?.() || 0;
+        const bTime = b.created_at?.toMillis?.() || 0;
+        return bTime - aTime;
+    });
 };
 
 export const getProjectById = async (projectId: string): Promise<any> => {
@@ -101,53 +106,76 @@ export const createProject = async (userId: string, projectData: any, initialMem
     return projectId;
 };
 
-export const searchUsersByEmail = async (searchString: string, currentUserId?: string) => {
-    // We can do a prefix search using where if we know what field we're searching.
-    // Let's do prefix search on username.
+export const searchUsersByKeyword = async (searchString: string, currentUserId?: string) => {
     const searchLower = searchString.toLowerCase();
 
-    // -- PENDING --
-    // -- where query for current user != --
-
-    // Prefix search trick in Firebase:
-    // >= searchLower and <= searchLower + '\uf8ff'
-    const q = query(
+    // Search by username prefix
+    const usernameQuery = query(
         userRef,
         where("username", ">=", searchLower),
         where("username", "<=", searchLower + "\uf8ff")
     );
 
-    const snapshot = await getDocs(q);
-    const users: any[] = [];
+    // Search by email prefix
+    const emailQuery = query(
+        userRef,
+        where("email", ">=", searchLower),
+        where("email", "<=", searchLower + "\uf8ff")
+    );
 
-    snapshot.forEach((doc) => {
+    const [usernameSnap, emailSnap] = await Promise.all([
+        getDocs(usernameQuery),
+        getDocs(emailQuery),
+    ]);
+
+    const usersMap = new Map<string, any>();
+
+    usernameSnap.forEach((doc) => {
         const data = doc.data();
-        if (currentUserId && data.id === currentUserId) return; // Don't show current user
-        users.push(data);
+        if (currentUserId && data.id === currentUserId) return;
+        usersMap.set(data.id, data);
     });
 
-    return users;
+    emailSnap.forEach((doc) => {
+        const data = doc.data();
+        if (currentUserId && data.id === currentUserId) return;
+        usersMap.set(data.id, data);
+    });
+
+    return Array.from(usersMap.values());
 };
 
 export const getProjectMembers = async (projectId: string) => {
-    const snap = await getDocs(query(projectMembersRef, where("project_id", "==", projectId)));
+    // Sorted by joined_at (oldest first) via Firestore orderBy — requires composite index
+    const snap = await getDocs(
+        query(projectMembersRef, where("project_id", "==", projectId), orderBy("joined_at", "asc"))
+    );
     const memberRows = snap.docs.map(d => d.data());
 
-    const members = await Promise.all(
-        memberRows.map(async (row: any) => {
-            // fetch user data from profile
-            const userSnap = await getDoc(doc(db, "profiles", row.user_id));
-            const profile = userSnap.exists() ? userSnap.data() : null;
-            return {
-                id: row.user_id,
-                name: profile?.username || "Unknown",
-                avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.username || "U"}&background=2563EB&color=fff&size=200`,
-                role: row.role,
-            };
-        })
+    if (memberRows.length === 0) return [];
+
+    // Batch fetch all profiles in a single query instead of N individual getDoc calls
+    const userIds = memberRows.map((row: any) => row.user_id);
+    const profilesSnap = await getDocs(
+        query(userRef, where(documentId(), "in", userIds))
     );
 
-    return members;
+    // Build a map for quick lookup
+    const profileMap = new Map<string, any>();
+    profilesSnap.forEach((doc) => {
+        profileMap.set(doc.id, doc.data());
+    });
+
+    // Map members with their profile data (preserving joined_at order)
+    return memberRows.map((row: any) => {
+        const profile = profileMap.get(row.user_id) || null;
+        return {
+            id: row.user_id,
+            name: profile?.username || "Unknown",
+            avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.username || "U"}&background=2563EB&color=fff&size=200`,
+            role: row.role,
+        };
+    });
 };
 
 export const getCurrentUserRole = async (projectId: string, userId: string) => {
@@ -181,3 +209,23 @@ export const addMembersToProject = async (projectId: string, members: any[]) => 
 
     await batch.commit();
 };
+
+/*
+// TODO: Implement member management functions when needed in the future
+export const updateMemberRole = async (projectId: string, userId: string, role: string) => {
+    // const membershipId = `${projectId}_${userId}`;
+    // const membershipRef = doc(db, "project_members", membershipId);
+    // await updateDoc(membershipRef, { role, updated_at: serverTimestamp() });
+};
+
+export const removeMemberFromProject = async (projectId: string, userId: string) => {
+    // const membershipId = `${projectId}_${userId}`;
+    // const membershipRef = doc(db, "project_members", membershipId);
+    // await deleteDoc(membershipRef);
+};
+
+export const isLastOwner = async (projectId: string, userId: string) => {
+    // Query count of owners for projectId. If count is 1 and this user is owner, return true.
+    return false;
+};
+*/

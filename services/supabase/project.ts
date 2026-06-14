@@ -9,20 +9,19 @@ export const getProjectList = async (userId: string) => {
     .select("project_id")
     .eq("user_id", userId);
 
-  console.log('fetch project ids with associated project members :', { userMemberships, membershipError });
+
 
   if (membershipError) throw new Error(membershipError.message);
   if (!userMemberships?.length) return [];
 
   const projectIds = userMemberships.map((pm: any) => pm.project_id);
 
-  // fetch projects data as per project ids
+  // fetch projects data as per project ids, ordered by created_at (newest first)
   const { data: projects, error: projectError } = await supabase
     .from("projects")
     .select("*")
-    .in("id", projectIds);
-
-  console.log('fetch projects data as per project ids :', { projects, projectError });
+    .in("id", projectIds)
+    .order("created_at", { ascending: false });
 
   if (projectError) throw new Error(projectError.message);
 
@@ -40,7 +39,7 @@ export const getProjectList = async (userId: string) => {
     .select("project_id, id")
     .in("project_id", projectIds);
 
-  console.log('fetch total task counts as per project ids : ', { taskCounts, tasksError });
+
 
   if (tasksError) throw new Error(tasksError.message);
 
@@ -60,7 +59,7 @@ export const getProjectList = async (userId: string) => {
   // TODO: Invitation flow with email token, expiry, accept/decline
   // TODO: Activity log insertion on project actions
 
-  console.log('projectsWithMembers: ', { projectsWithMembers });
+
 
   return projectsWithMembers;
 };
@@ -93,7 +92,7 @@ export const createProject = async (
     })
     .select("id")
     .single();
-  console.log({ projectError });
+
 
   if (projectError) {
     throw new Error(`Failed to create project: ${projectError.message}`);
@@ -137,17 +136,12 @@ export const createProject = async (
 };
 
 export const searchUsersByKeyword = async (searchString: string, currentUserId: string) => {
-  // -- PENDING --
-  // -- search by email not just username --
-
-
-  // Query profiles table matching username (since there's no email in profiles schema)
-  // Exclude the current user from the results
+  // Search profiles by username or email (email column added to profiles table)
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, avatar_url")
+    .select("id, username, avatar_url, email")
     .neq("id", currentUserId)
-    .or(`username.ilike.%${searchString}%`)
+    .or(`username.ilike.%${searchString}%,email.ilike.%${searchString}%`)
     .limit(20);
 
   if (error) {

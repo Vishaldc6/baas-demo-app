@@ -8,7 +8,8 @@ export const getProjectMembers = async (projectId: string) => {
       role,
       profiles:user_id ( id, username, avatar_url )
     `)
-    .eq("project_id", projectId);
+    .eq("project_id", projectId)
+    .order("joined_at", { ascending: true });
 
   if (error) throw new Error(error.message);
   return data.map((item: any) => ({
@@ -30,3 +31,32 @@ export const getCurrentUserRole = async (projectId: string, userId: string) => {
   if (error) return null;
   return data?.role;
 };
+
+/*
+// TODO: Implement member management functions when needed in the future
+export const updateMemberRole = async (projectId: string, userId: string, role: string) => {
+  // const { data, error } = await supabase
+  //   .from("project_members")
+  //   .update({ role })
+  //   .eq("project_id", projectId)
+  //   .eq("user_id", userId);
+  // if (error) throw new Error(error.message);
+  // return data;
+};
+
+export const removeMemberFromProject = async (projectId: string, userId: string) => {
+  // const { data, error } = await supabase
+  //   .from("project_members")
+  //   .delete()
+  //   .eq("project_id", projectId)
+  //   .eq("user_id", userId);
+  // if (error) throw new Error(error.message);
+  // return data;
+};
+
+export const isLastOwner = async (projectId: string, userId: string) => {
+  // Query count of owners for projectId. If count is 1 and this user is owner, return true.
+  return false;
+};
+*/
+

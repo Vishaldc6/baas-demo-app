@@ -55,7 +55,7 @@ export function AddMembersModal({
       try {
         let results: UserProfile[] = [];
         if (provider === "firebase") {
-          results = await FirebaseProject.searchUsersByEmail(
+          results = await FirebaseProject.searchUsersByKeyword(
             searchQuery.trim(),
             currentUserId,
           );
@@ -169,7 +169,10 @@ export function AddMembersModal({
                           {item.username.charAt(0).toUpperCase()}
                         </Text>
                       </View>
-                      <Text style={styles.username}>{item.username}</Text>
+                      <View>
+                        <Text style={styles.username}>{item.username}</Text>
+                        <Text style={styles.emailText}>{item.email}</Text>                        
+                      </View>
                     </View>
                     <View
                       style={[
@@ -293,6 +296,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Theme.colors.text,
     fontWeight: "500",
+  },
+  emailText: {
+    fontSize: 13,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
   },
   checkbox: {
     width: 24,

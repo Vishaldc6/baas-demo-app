@@ -25,7 +25,6 @@ import { SupabaseProject } from "../../services/supabase";
 export default function CreateProject() {
   const router = useRouter();
   const { user, provider } = useAuth();
-  console.log({ user });
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -35,6 +34,15 @@ export default function CreateProject() {
   const [selectedMembers, setSelectedMembers] = useState<any[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Regex to match emoji characters only
+  const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+
+  const extractEmoji = (text: string): string => {
+    const emojis = text.match(emojiRegex);
+    if (!emojis) return icon; // keep previous emoji if input has none
+    return emojis[emojis.length - 1]; // take the last emoji entered
+  };
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -101,8 +109,7 @@ export default function CreateProject() {
             style={[styles.input, styles.iconInput]}
             value={icon}
             onChangeText={(text) => {
-              // keep only the last character or emoji
-              setIcon(text.slice(-2));
+              setIcon(extractEmoji(text));
             }}
             placeholder="🚀"
             placeholderTextColor={Theme.colors.textSecondary}

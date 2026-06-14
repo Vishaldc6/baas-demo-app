@@ -17,6 +17,7 @@ import { AddMembersModal } from "../../components/AddMembersModal";
 import { ProfileSheet } from "../../components/ProfileSheet";
 import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
+import { TaskEditModal } from "../../components/TaskEditModal";
 
 import { FirebaseProject, FirebaseTask } from "../../services/firebase";
 import {
@@ -38,6 +39,7 @@ export default function ProjectDetails() {
   const [members, setMembers] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedTaskToEdit, setSelectedTaskToEdit] = useState<any | null>(null);
 
   React.useEffect(() => {
     loadData();
@@ -104,15 +106,49 @@ export default function ProjectDetails() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const normalized = status?.toLowerCase() || "todo";
+    switch (normalized) {
       case "completed":
-      case "Completed":
+      case "done":
         return "#10B981";
       case "in_progress":
-      case "In Progress":
         return "#3B82F6";
+      case "in_review":
+        return "#F59E0B";
+      case "backlog":
+        return "#6B7280";
+      case "cancelled":
+        return "#EF4444";
       default:
         return "#6B7280";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      todo: "To Do",
+      in_progress: "In Progress",
+      in_review: "In Review",
+      done: "Done",
+      backlog: "Backlog",
+      cancelled: "Cancelled",
+    };
+    const normalized = status?.toLowerCase() || "todo";
+    return map[normalized] || status || "To Do";
+  };
+
+  const handleUpdateTask = async (taskId: string, updates: { status: string; assignee_id: string | null }) => {
+    try {
+      if (provider === "firebase") {
+        await FirebaseTask.updateTask(taskId, updates);
+      } else if (provider === "supabase") {
+        await SupabaseTask.updateTask(taskId, updates);
+      }
+      Alert.alert("Success", "Task updated successfully");
+      loadData();
+    } catch (error: any) {
+      console.error("Failed to update task:", error);
+      Alert.alert("Error", error.message || "Failed to update task");
     }
   };
 
@@ -123,14 +159,19 @@ export default function ProjectDetails() {
 
   const renderTaskItem = ({ item }: { item: any }) => {
     const assigneeName = getAssigneeName(item.assignee_id);
+    const isCompleted = item.status === "Completed" || item.status?.toLowerCase() === "done";
     return (
-      <TouchableOpacity style={styles.taskCard} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={styles.taskCard}
+        activeOpacity={0.7}
+        onPress={() => setSelectedTaskToEdit(item)}
+      >
         <View style={styles.taskMain}>
           <View style={styles.titleRow}>
             <Text
               style={[
                 styles.taskTitle,
-                item.status === "Completed" && styles.completedTaskTitle,
+                isCompleted && styles.completedTaskTitle,
               ]}
             >
               {item.title}
@@ -153,7 +194,7 @@ export default function ProjectDetails() {
                   { color: getStatusColor(item.status) },
                 ]}
               >
-                {item.status || "todo"}
+                {getStatusLabel(item.status)}
               </Text>
             </View>
           </View>
@@ -165,6 +206,10 @@ export default function ProjectDetails() {
 
   const renderMemberItem = ({ item }: { item: any }) => (
     <View style={styles.memberCard}>
+      {/* TODO: Implement role update / member removal UI triggers here if needed in future.
+          Example: If isOwner is true, tapping a member card could show an Alert/ActionSheet
+          to "Change Role (Owner/Member)" or "Remove Member from Project".
+      */}
       <Image
         source={{
           uri: item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name || "U")}&background=2563EB&color=fff&size=96`,
@@ -175,6 +220,9 @@ export default function ProjectDetails() {
         <Text style={styles.memberName}>{item.name}</Text>
         <Text style={styles.memberRole}>{item.role}</Text>
       </View>
+      {/* TODO: Implement leave project UI trigger if needed in future.
+          Example: Tapping own user card could show "Leave Project" confirmation dialog.
+      */}
       <TouchableOpacity
         style={styles.messageButton}
         onPress={() => setProfileSheetUserId(item.id)}
@@ -311,6 +359,14 @@ export default function ProjectDetails() {
         visible={!!profileSheetUserId}
         userId={profileSheetUserId || ""}
         onClose={() => setProfileSheetUserId(null)}
+      />
+
+      <TaskEditModal
+        visible={!!selectedTaskToEdit}
+        onClose={() => setSelectedTaskToEdit(null)}
+        task={selectedTaskToEdit}
+        projectMembers={members}
+        onSave={handleUpdateTask}
       />
     </View>
   );

@@ -8,17 +8,22 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
 import { FirebaseTask } from "../../services/firebase";
 import { SupabaseTask } from "../../services/supabase";
+import { TaskEditModal } from "../../components/TaskEditModal";
 
 const STATUS_FILTERS = [
   { key: "all", label: "All" },
+  { key: "backlog", label: "Backlog" },
   { key: "todo", label: "To Do" },
   { key: "in_progress", label: "In Progress" },
+  { key: "in_review", label: "In Review" },
   { key: "done", label: "Done" },
+  { key: "cancelled", label: "Cancelled" },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -26,6 +31,7 @@ const STATUS_COLORS: Record<string, string> = {
   in_progress: "#3B82F6",
   done: "#10B981",
   backlog: "#9CA3AF",
+  in_review: "#F59E0B",
   cancelled: "#EF4444",
 };
 
@@ -41,6 +47,22 @@ export default function MyTasks() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [selectedTaskToEdit, setSelectedTaskToEdit] = useState<any | null>(null);
+
+  const handleUpdateTask = async (taskId: string, updates: { status: string; assignee_id: string | null }) => {
+    try {
+      if (provider === "firebase") {
+        await FirebaseTask.updateTask(taskId, updates);
+      } else if (provider === "supabase") {
+        await SupabaseTask.updateTask(taskId, updates);
+      }
+      Alert.alert("Success", "Task updated successfully");
+      fetchTasks();
+    } catch (err: any) {
+      console.error("Failed to update task:", err);
+      Alert.alert("Error", err.message || "Failed to update task");
+    }
+  };
 
   useEffect(() => {
     fetchTasks();
@@ -90,7 +112,11 @@ export default function MyTasks() {
     const statusColor = STATUS_COLORS[item.status] || "#6B7280";
 
     return (
-      <TouchableOpacity style={styles.taskCard} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={styles.taskCard}
+        activeOpacity={0.7}
+        onPress={() => setSelectedTaskToEdit(item)}
+      >
         <View style={styles.taskInfo}>
           <Text
             style={[
@@ -100,8 +126,8 @@ export default function MyTasks() {
           >
             {item.title}
           </Text>
-          {item.project_id && (
-            <Text style={styles.projectId}>Project: {item.project_id.slice(0, 8)}...</Text>
+          {item.project_name && (
+            <Text style={styles.projectId}>Project: {item.project_name}</Text>
           )}
           <View style={styles.metaRow}>
             <View
@@ -214,6 +240,12 @@ export default function MyTasks() {
           )}
         />
       )}
+      <TaskEditModal
+        visible={!!selectedTaskToEdit}
+        onClose={() => setSelectedTaskToEdit(null)}
+        task={selectedTaskToEdit}
+        onSave={handleUpdateTask}
+      />
     </View>
   );
 }

@@ -30,6 +30,7 @@ export const signUp = async (email: string, password?: string) => {
   await setDoc(doc(userRef, uid), {
     id: uid,
     username,
+    email,
     avatar_url: null,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp()
