@@ -3,7 +3,7 @@ import {
   signOut as fbSignOut,
   signInWithEmailAndPassword
 } from "firebase/auth";
-import { doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, userRef } from "./config";
 
 export const signIn = async (email: string, password?: string) => {
@@ -17,22 +17,8 @@ export const signIn = async (email: string, password?: string) => {
   return userCredential.user;
 };
 
-const checkUsernameExists = async (username: string) => {
-  const q = query(
-    userRef,
-    where("username", "==", username)
-  );
-
-  const snapshot = await getDocs(q);
-  return !snapshot.empty;
-};
-
 export const signUp = async (email: string, password?: string) => {
   const username = email.split('@')[0];
-  const userExists = await checkUsernameExists(username);
-  if (userExists) {
-    throw new Error("Username already exists.");
-  }
 
   const userCredential = await createUserWithEmailAndPassword(
     auth,
