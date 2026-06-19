@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 
+import * as DocumentPicker from "expo-document-picker";
 import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
 import { FirebaseProject, FirebaseTask } from "../../services/firebase";
@@ -33,9 +34,31 @@ export default function CreateTask() {
   const [description, setDescription] = useState("");
   const [assignedUser, setAssignedUser] = useState<any>(null);
   const [projectMembers, setProjectMembers] = useState<any[]>([]);
+  const [attachment, setAttachment] = useState<any>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setAttachment({
+          uri: asset.uri,
+          name: asset.name,
+          mimeType: asset.mimeType,
+          size: asset.size,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to pick document:", error);
+      Alert.alert("Error", "Failed to select document");
+    }
+  };
 
   useEffect(() => {
     fetchProjectMembers();
@@ -77,6 +100,7 @@ export default function CreateTask() {
         description: description.trim(),
         assignee_id: assignedUser?.id || null,
         created_by: user?.id || "",
+        attachment: attachment || null,
       };
 
       if (provider === "supabase") {
@@ -203,6 +227,39 @@ export default function CreateTask() {
                 </View>
               )}
             </>
+          )}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Attachment</Text>
+          {attachment ? (
+            <View style={styles.attachmentContainer}>
+              <View style={styles.attachmentDetails}>
+                <Feather name="file" size={20} color={Theme.colors.primary} />
+                <View style={styles.attachmentTextContainer}>
+                  <Text style={styles.attachmentName} numberOfLines={1}>
+                    {attachment.name}
+                  </Text>
+                  <Text style={styles.attachmentSize}>
+                    {attachment.size ? `${(attachment.size / 1024).toFixed(1)} KB` : "Unknown Size"}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setAttachment(null)}
+                style={styles.removeAttachmentButton}
+              >
+                <Feather name="trash-2" size={18} color={Theme.colors.error} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.attachmentSelector}
+              onPress={handlePickDocument}
+            >
+              <Feather name="paperclip" size={20} color={Theme.colors.textSecondary} />
+              <Text style={styles.attachmentSelectorText}>Attach a document</Text>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -354,5 +411,54 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
+  },
+  attachmentContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Theme.colors.background,
+    borderRadius: Theme.radius.md,
+    padding: Theme.spacing.md,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+  },
+  attachmentDetails: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  attachmentTextContainer: {
+    flex: 1,
+  },
+  attachmentName: {
+    fontSize: 15,
+    color: Theme.colors.text,
+    fontWeight: "600",
+  },
+  attachmentSize: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  removeAttachmentButton: {
+    padding: 8,
+  },
+  attachmentSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Theme.colors.background,
+    borderRadius: Theme.radius.md,
+    padding: Theme.spacing.md,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: Theme.colors.textSecondary,
+    gap: 8,
+  },
+  attachmentSelectorText: {
+    fontSize: 15,
+    color: Theme.colors.textSecondary,
+    fontWeight: "600",
   },
 });

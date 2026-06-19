@@ -1,5 +1,9 @@
 import { addDoc, doc, getDoc, getDocs, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
-import { db, tasksRef } from "./config";
+import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { app, db, tasksRef } from "./config";
+
+// Initialize Firebase Storage
+const storage = getStorage(app);
 
 export interface TaskData {
   project_id: string;
@@ -11,18 +15,53 @@ export interface TaskData {
   created_by: string;
   due_date?: string;
   position?: number;
+  attachment?: any;
 }
 
 export const createTask = async (taskData: TaskData) => {
+  const { attachment, ...restTaskData } = taskData;
   const docRef = await addDoc(tasksRef, {
-    ...taskData,
+    ...restTaskData,
     status: taskData.status || "todo",
     priority: taskData.priority || "none",
     position: taskData.position || 0,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
   });
-  return { id: docRef.id, ...taskData };
+
+  let attachmentUrl = null;
+  if (attachment) {
+    attachmentUrl = await uploadTaskAttachment(docRef.id, attachment);
+  }
+
+  return { id: docRef.id, ...restTaskData, attachment: attachmentUrl };
+};
+
+export const uploadTaskAttachment = async (taskId: string, file: any): Promise<string> => {
+  const fileName = file.name || "attachment.file";
+  const storagePath = `task-attachments/task-${taskId}/${fileName}`;
+  const storageRef = ref(storage, storagePath);
+
+  // Read the file as a blob for upload
+  const response = await fetch(file.uri);
+  const blob = await response.blob();
+
+  // Upload to Firebase Storage
+  await uploadBytes(storageRef, blob, {
+    contentType: file.mimeType || "application/octet-stream",
+  });
+
+  // Get the download URL
+  const downloadUrl = await getDownloadURL(storageRef);
+
+  // Update the task document in Firestore with the attachment URL
+  const taskRef = doc(tasksRef, taskId);
+  await updateDoc(taskRef, {
+    attachment: downloadUrl,
+    updated_at: serverTimestamp(),
+  });
+
+  return downloadUrl;
 };
 
 export const updateTask = async (taskId: string, updates: Partial<TaskData>) => {
@@ -37,11 +76,11 @@ export const updateTask = async (taskId: string, updates: Partial<TaskData>) => 
 // TODO: Task delete
 
 export const getTasksByProject = async (projectId: string, lastDocId?: string | null, pageSize = 7) => {
-  // Sorted by created_at (oldest first) via Firestore orderBy — requires composite index
+  // Sorted by created_at (newest first) via Firestore orderBy — requires composite index
   const q = query(
     tasksRef,
     where("project_id", "==", projectId),
-    orderBy("created_at", "asc"),
+    orderBy("created_at", "desc"),
   );
   const snapshot = await getDocs(q);
   const allTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -73,8 +112,12 @@ export const getTasksByAssignee = async (assigneeId: string, lastDocId?: string 
   const snapshot = await getDocs(q);
   const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  // Sort tasks in-memory by position or creation time
-  const sortedTasks = tasks.sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
+  // Sort tasks in-memory by creation time (newest first)
+  const sortedTasks = tasks.sort((a: any, b: any) => {
+    const aTime = a.created_at?.toMillis ? a.created_at.toMillis() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+    const bTime = b.created_at?.toMillis ? b.created_at.toMillis() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+    return bTime - aTime;
+  });
 
   let startIndex = 0;
   if (lastDocId) {

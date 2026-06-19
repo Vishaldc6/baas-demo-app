@@ -70,17 +70,15 @@ export const uploadTaskAttachment = async (taskId: string, file: any): Promise<s
     data: { publicUrl },
   } = supabase.storage.from("task-attachments").getPublicUrl(filePath);
 
-  // -- PENDING --
-  // attachment column not found error
   // Update the task with the new attachment URL
-  // const { error: updateError } = await supabase
-  //   .from("tasks")
-  //   .update({ attachment: publicUrl })
-  //   .eq("id", taskId);
+  const { error: updateError } = await supabase
+    .from("tasks")
+    .update({ attachment: publicUrl })
+    .eq("id", taskId);
 
-  // if (updateError) {
-  //   throw new Error(`Failed to update task with attachment: ${updateError.message}`);
-  // }
+  if (updateError) {
+    throw new Error(`Failed to update task with attachment: ${updateError.message}`);
+  }
 
   return publicUrl;
 };
@@ -105,7 +103,7 @@ export const getTasksByProject = async (projectId: string, page = 1, pageSize = 
     .from("tasks")
     .select("*")
     .eq("project_id", projectId)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .range(from, to);
 
   if (error) {
@@ -126,7 +124,7 @@ export const getTasksByAssignee = async (assigneeId: string, page = 1, pageSize 
     .from("tasks")
     .select("*, projects(name)")
     .eq("assignee_id", assigneeId)
-    .order("position", { ascending: true })
+    .order("created_at", { ascending: false })
     .range(from, to);
 
   if (error) {

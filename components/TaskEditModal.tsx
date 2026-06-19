@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Image,
   Alert,
+  Linking,
 } from "react-native";
 import { Theme } from "../constants/Theme";
 import { useAuth } from "./AuthProvider";
@@ -31,6 +32,7 @@ interface Task {
   status: string;
   priority?: string;
   assignee_id?: string | null;
+  attachment?: string | null;
 }
 
 interface TaskEditModalProps {
@@ -144,6 +146,31 @@ export function TaskEditModal({
                 <Text style={styles.noDesc}>No description provided</Text>
               )}
             </View>
+
+            {/* Task Attachment */}
+            {task.attachment ? (
+              <View style={styles.attachmentGroup}>
+                <Text style={styles.label}>Attachment</Text>
+                <TouchableOpacity
+                  style={styles.attachmentButton}
+                  onPress={() => {
+                    if (task.attachment) {
+                      Linking.openURL(task.attachment).catch((err) => {
+                        console.error("Failed to open URL:", err);
+                        Alert.alert("Error", "Could not open attachment link");
+                      });
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Feather name="file" size={20} color={Theme.colors.primary} />
+                  <Text style={styles.attachmentButtonText} numberOfLines={1}>
+                    View Attached File
+                  </Text>
+                  <Feather name="external-link" size={16} color={Theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             {/* Status Selector */}
             <View style={styles.selectorGroup}>
@@ -474,5 +501,24 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
+  },
+  attachmentGroup: {
+    marginBottom: Theme.spacing.lg,
+  },
+  attachmentButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Theme.colors.background,
+    borderRadius: Theme.radius.md,
+    padding: Theme.spacing.md,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    gap: 12,
+  },
+  attachmentButtonText: {
+    flex: 1,
+    fontSize: 15,
+    color: Theme.colors.text,
+    fontWeight: "600",
   },
 });

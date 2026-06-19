@@ -4,7 +4,7 @@ import supabaseClient from "./config";
 import * as SupabaseNotification from "./notification";
 import * as SupabaseProfile from "./profile";
 import * as SupabaseProject from "./project";
-import * as SupabaseProjectMembers from "./project_members";
+import * as SupabaseProjectMembers from "./project";
 import * as SupabaseTask from "./task";
 
 export { SupabaseAuth, SupabaseChat, supabaseClient, SupabaseNotification, SupabaseProfile, SupabaseProject, SupabaseProjectMembers, SupabaseTask };

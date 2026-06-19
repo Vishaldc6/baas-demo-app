@@ -79,6 +79,22 @@ export const getUserProjectsWithLatestMessage = async (userId: string) => {
   return result.filter(Boolean);
 };
 
+// -- PENDING ADVANCED CHAT FEATURES (TO BE DEMONSTRATED LATER) --
+// TODO: Reply to message (schema supports reply_to_id)
+// TODO: Edit message content (schema supports is_edited)
+// TODO: Soft delete message (schema supports is_deleted)
+// TODO: Mentions (schema supports mentions array)
+// TODO: Paginated Message Loading (cursor-based pagination via startAfter)
+
+/**
+ * Real-time message listener for Firebase Firestore.
+ * 
+ * NOTE (Real-time Signature Mismatch Comparison):
+ * Firestore's onSnapshot() is document-set based. Every time there is an update (an insert,
+ * modify, or delete) to any message in the query, Firestore sends the FULL snapshot of all
+ * matching documents. The callback receives the entire parsed messages array, making local
+ * state management simple but consuming more client-side bandwith/reads.
+ */
 export const listenToProjectMessages = (projectId: string, callback: (messages: any[]) => void) => {
   const q = query(
     messagesRef,

@@ -85,6 +85,23 @@ export const getUserProjectsWithLatestMessage = async (userId: string) => {
   return result;
 };
 
+// -- PENDING ADVANCED CHAT FEATURES (TO BE DEMONSTRATED LATER) --
+// TODO: Reply to message (schema supports reply_to_id)
+// TODO: Edit message content (schema supports is_edited)
+// TODO: Soft delete message (schema supports is_deleted)
+// TODO: Mentions (schema supports mentions array)
+// TODO: Paginated Message Loading (range-based pagination)
+
+/**
+ * Real-time message listener for Supabase.
+ * 
+ * NOTE (Real-time Signature Mismatch Comparison):
+ * Supabase uses PostgreSQL Change Data Capture (CDC) via WebSockets. The client subscribes
+ * to specific events (like INSERT) on the `messages` table filtered by `project_id`. When
+ * a change occurs, Supabase streams ONLY the payload of that single new row (`payload.new`),
+ * rather than the full list. The app is responsible for appending/updating this single
+ * message in its local component state.
+ */
 export const listenToNewMessages = (projectId: string, callback: (message: any) => void) => {
   console.log(`[Chat] Setting up realtime subscription for project: ${projectId}`);
 

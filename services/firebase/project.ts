@@ -32,7 +32,7 @@ export const getProjectList = async (userId: string, lastDocId?: string | null, 
     );
 
     // Sort by created_at (newest first)
-    const sortedProjects = projects.filter(Boolean).sort((a: any, b: any) => {
+    const sortedProjects = (projects.filter(Boolean) as any[]).sort((a: any, b: any) => {
         const aTime = a.created_at?.toMillis?.() || 0;
         const bTime = b.created_at?.toMillis?.() || 0;
         return bTime - aTime;
