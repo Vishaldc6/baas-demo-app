@@ -1,7 +1,7 @@
 import supabase from "./config";
 
-export const getProjectList = async (userId: string) => {
-  if (!userId) return [];
+export const getProjectList = async (userId: string, page = 1, pageSize = 5) => {
+  if (!userId) return { data: [], hasMore: false };
 
   // fetch project ids with associated project members
   const { data: userMemberships, error: membershipError } = await supabase
@@ -9,37 +9,46 @@ export const getProjectList = async (userId: string) => {
     .select("project_id")
     .eq("user_id", userId);
 
-
-
   if (membershipError) throw new Error(membershipError.message);
-  if (!userMemberships?.length) return [];
+  if (!userMemberships?.length) return { data: [], hasMore: false };
 
   const projectIds = userMemberships.map((pm: any) => pm.project_id);
 
-  // fetch projects data as per project ids, ordered by created_at (newest first)
+  // Paginated fetch of projects data as per project ids
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize; // Fetch 1 extra to check hasMore
+
   const { data: projects, error: projectError } = await supabase
     .from("projects")
     .select("*")
     .in("id", projectIds)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   if (projectError) throw new Error(projectError.message);
 
-  // fetch project members as per project ids
+  const hasMore = (projects?.length || 0) > pageSize;
+  const paginatedProjects = hasMore ? projects.slice(0, pageSize) : (projects || []);
+
+  if (paginatedProjects.length === 0) {
+    return { data: [], hasMore: false };
+  }
+
+  const paginatedProjectIds = paginatedProjects.map((p: any) => p.id);
+
+  // fetch project members only for paginated projects
   const { data: projectMembers, error: membersError } = await supabase
     .from("project_members")
     .select("project_id, user_id, role")
-    .in("project_id", projectIds);
+    .in("project_id", paginatedProjectIds);
 
   if (membersError) throw new Error(membersError.message);
 
-  // fetch total task counts as per project ids 
+  // fetch total task counts only for paginated projects
   const { data: taskCounts, error: tasksError } = await supabase
     .from("tasks")
     .select("project_id, id")
-    .in("project_id", projectIds);
-
-
+    .in("project_id", paginatedProjectIds);
 
   if (tasksError) throw new Error(tasksError.message);
 
@@ -48,7 +57,7 @@ export const getProjectList = async (userId: string) => {
     taskCountMap[t.project_id] = (taskCountMap[t.project_id] || 0) + 1;
   }
 
-  const projectsWithMembers = projects?.map((p: any) => {
+  const projectsWithMembers = paginatedProjects.map((p: any) => {
     const members = projectMembers?.filter((pm: any) => pm.project_id === p.id);
     return { ...p, members, taskCount: taskCountMap[p.id] || 0 };
   });
@@ -60,8 +69,8 @@ export const getProjectList = async (userId: string) => {
   // TODO: Activity log insertion on project actions
 
 
-
-  return projectsWithMembers;
+  
+  return { data: projectsWithMembers, hasMore };
 };
 
 export const getProjectById = async (projectId: string) => {
@@ -170,4 +179,13 @@ export const addMembersToProject = async (projectId: string, members: any[]) => 
   if (error) {
     throw new Error(`Failed to add members: ${error.message}`);
   }
+};
+
+export const deleteProject = async (projectId: string) => {
+  const { error } = await supabase
+    .from("projects")
+    .delete()
+    .eq("id", projectId);
+
+  if (error) throw new Error(error.message);
 };

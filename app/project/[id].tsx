@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -41,37 +41,42 @@ export default function ProjectDetails() {
   const [loading, setLoading] = useState(true);
   const [selectedTaskToEdit, setSelectedTaskToEdit] = useState<any | null>(null);
 
-  React.useEffect(() => {
-    loadData();
-  }, [id, provider]);
+  const [taskPage, setTaskPage] = useState(1);
+  const [taskLastDocId, setTaskLastDocId] = useState<string | null>(null);
+  const [tasksHasMore, setTasksHasMore] = useState(false);
+  const [loadingMoreTasks, setLoadingMoreTasks] = useState(false);
 
-  const loadData = async () => {
+  const loadData = React.useCallback(async () => {
     if (!id || !provider || !user?.id) return;
     setLoading(true);
     try {
       const projectId = id as string;
       if (provider === "supabase") {
-        const [projectData, fetchedTasks, fetchedMembers, role] = await Promise.all([
+        const [projectData, taskRes, fetchedMembers, role] = await Promise.all([
           SupabaseProject.getProjectById(projectId),
-          SupabaseTask.getTasksByProject(projectId),
+          SupabaseTask.getTasksByProject(projectId, 1, 7),
           SupabaseProjectMembers.getProjectMembers(projectId),
           SupabaseProjectMembers.getCurrentUserRole(projectId, user.id),
         ]);
         setProject(projectData);
-        setTasks(fetchedTasks || []);
+        setTasks(taskRes.data || []);
+        setTasksHasMore(taskRes.hasMore || false);
+        setTaskPage(1);
         setMembers(fetchedMembers || []);
         setIsOwner(role === "owner");
       }
 
       if (provider === "firebase") {
-        const [projectData, fetchedTasks, fetchedMembers, role] = await Promise.all([
+        const [projectData, taskRes, fetchedMembers, role] = await Promise.all([
           FirebaseProject.getProjectById(projectId),
-          FirebaseTask.getTasksByProject(projectId),
+          FirebaseTask.getTasksByProject(projectId, null, 7),
           FirebaseProject.getProjectMembers(projectId),
           FirebaseProject.getCurrentUserRole(projectId, user.id),
         ]);
         setProject(projectData);
-        setTasks(fetchedTasks || []);
+        setTasks(taskRes.data || []);
+        setTasksHasMore(taskRes.hasMore || false);
+        setTaskLastDocId(taskRes.lastDoc);
         setMembers(fetchedMembers || []);
         setIsOwner(role === "owner");
       }
@@ -80,6 +85,107 @@ export default function ProjectDetails() {
     } finally {
       setLoading(false);
     }
+  }, [id, provider, user?.id]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
+  const loadMoreTasks = async () => {
+    if (activeTab !== "Tasks" || loadingMoreTasks || !tasksHasMore || !id || !provider) return;
+    setLoadingMoreTasks(true);
+    try {
+      const projectId = id as string;
+      if (provider === "supabase") {
+        const nextPage = taskPage + 1;
+        const taskRes = await SupabaseTask.getTasksByProject(projectId, nextPage, 7);
+        setTasks(prev => [...prev, ...(taskRes.data || [])]);
+        setTasksHasMore(taskRes.hasMore || false);
+        setTaskPage(nextPage);
+      } else if (provider === "firebase") {
+        const taskRes = await FirebaseTask.getTasksByProject(projectId, taskLastDocId, 7);
+        setTasks(prev => [...prev, ...(taskRes.data || [])]);
+        setTasksHasMore(taskRes.hasMore || false);
+        setTaskLastDocId(taskRes.lastDoc);
+      }
+    } catch (error) {
+      console.error("Failed to load more tasks:", error);
+    } finally {
+      setLoadingMoreTasks(false);
+    }
+  };
+
+  const renderTasksFooter = () => {
+    if (activeTab === "Tasks" && loadingMoreTasks) {
+      return (
+        <View style={{ paddingVertical: 20, alignItems: "center" }}>
+          <ActivityIndicator size="small" color={Theme.colors.primary} />
+        </View>
+      );
+    }
+    return null;
+  };
+
+  const handleDeleteProject = () => {
+    Alert.alert(
+      "Delete Project",
+      "Are you sure you want to delete this project? This will permanently delete all tasks, members, and messages associated with it. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              if (provider === "firebase") {
+                await FirebaseProject.deleteProject(id as string);
+              } else if (provider === "supabase") {
+                await SupabaseProject.deleteProject(id as string);
+              }
+              Alert.alert("Success", "Project deleted successfully");
+              router.replace("/(tabs)/home");
+            } catch (error: any) {
+              console.error("Failed to delete project:", error);
+              Alert.alert("Error", error.message || "Failed to delete project");
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRemoveMember = (memberId: string, memberName: string) => {
+    Alert.alert(
+      "Remove Member",
+      `Are you sure you want to remove ${memberName} from this project?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              if (provider === "firebase") {
+                await FirebaseProject.removeMemberFromProject(id as string, memberId);
+              } else if (provider === "supabase") {
+                await SupabaseProjectMembers.removeMemberFromProject(id as string, memberId);
+              }
+              Alert.alert("Success", "Member removed successfully");
+              loadData();
+            } catch (error: any) {
+              console.error("Failed to remove member:", error);
+              Alert.alert("Error", error.message || "Failed to remove member");
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const membersMap = useMemo(() => {
@@ -223,12 +329,22 @@ export default function ProjectDetails() {
       {/* TODO: Implement leave project UI trigger if needed in future.
           Example: Tapping own user card could show "Leave Project" confirmation dialog.
       */}
-      <TouchableOpacity
-        style={styles.messageButton}
-        onPress={() => setProfileSheetUserId(item.id)}
-      >
-        <Feather name="user" size={18} color={Theme.colors.primary} />
-      </TouchableOpacity>
+      <View style={{ flexDirection: "row" }}>
+        <TouchableOpacity
+          style={styles.messageButton}
+          onPress={() => setProfileSheetUserId(item.id)}
+        >
+          <Feather name="user" size={18} color={Theme.colors.primary} />
+        </TouchableOpacity>
+        {isOwner && item.id !== user?.id && (
+          <TouchableOpacity
+            style={[styles.messageButton, { backgroundColor: "#FEE2E2", marginLeft: 8 }]}
+            onPress={() => handleRemoveMember(item.id, item.name)}
+          >
+            <Feather name="trash-2" size={18} color={Theme.colors.error} />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 
@@ -249,9 +365,14 @@ export default function ProjectDetails() {
           >
             <Feather name="message-circle" size={22} color={Theme.colors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerActionButton}>
-            <Feather name="settings" size={22} color={Theme.colors.text} />
-          </TouchableOpacity>
+          {isOwner && (
+            <TouchableOpacity
+              style={styles.headerActionButton}
+              onPress={handleDeleteProject}
+            >
+              <Feather name="trash-2" size={22} color={Theme.colors.error} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -266,6 +387,9 @@ export default function ProjectDetails() {
           renderItem={activeTab === "Tasks" ? renderTaskItem : renderMemberItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.content}
+          onEndReached={activeTab === "Tasks" ? loadMoreTasks : undefined}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={renderTasksFooter}
           ListHeaderComponent={() => (
             <View style={styles.projectInfo}>
               <View style={styles.projectNameRow}>

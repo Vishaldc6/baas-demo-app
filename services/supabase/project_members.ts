@@ -32,22 +32,22 @@ export const getCurrentUserRole = async (projectId: string, userId: string) => {
   return data?.role;
 };
 
+export const removeMemberFromProject = async (projectId: string, userId: string) => {
+  const { data, error } = await supabase
+    .from("project_members")
+    .delete()
+    .eq("project_id", projectId)
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  return data;
+};
+
 /*
 // TODO: Implement member management functions when needed in the future
 export const updateMemberRole = async (projectId: string, userId: string, role: string) => {
   // const { data, error } = await supabase
   //   .from("project_members")
   //   .update({ role })
-  //   .eq("project_id", projectId)
-  //   .eq("user_id", userId);
-  // if (error) throw new Error(error.message);
-  // return data;
-};
-
-export const removeMemberFromProject = async (projectId: string, userId: string) => {
-  // const { data, error } = await supabase
-  //   .from("project_members")
-  //   .delete()
   //   .eq("project_id", projectId)
   //   .eq("user_id", userId);
   // if (error) throw new Error(error.message);

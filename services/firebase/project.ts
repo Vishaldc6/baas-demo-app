@@ -1,5 +1,5 @@
-import { collection, doc, documentId, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
-import { db, projectMembersRef, tasksRef, userRef } from "./config";
+import { collection, deleteDoc, doc, documentId, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, where, writeBatch } from "firebase/firestore";
+import { db, projectMembersRef, tasksRef, userRef, messagesRef } from "./config";
 
 const checkMembershipExists = async (projectId: string, userId: string) => {
     const q = query(
@@ -12,13 +12,13 @@ const checkMembershipExists = async (projectId: string, userId: string) => {
     return !snapshot.empty;
 };
 
-export const getProjectList = async (userId: string) => {
-    if (!userId) return [];
+export const getProjectList = async (userId: string, lastDocId?: string | null, pageSize = 5) => {
+    if (!userId) return { data: [], hasMore: false, lastDoc: null };
 
     // fetched project member data
     const memberQuery = query(projectMembersRef, where("user_id", "==", userId));
     const memberSnapshot = await getDocs(memberQuery);
-    if (memberSnapshot.empty) return [];
+    if (memberSnapshot.empty) return { data: [], hasMore: false, lastDoc: null };
 
     const projectIds = memberSnapshot.docs.map(d => d.data().project_id);
 
@@ -27,13 +27,38 @@ export const getProjectList = async (userId: string) => {
             // fetch project data
             const projectDoc = await getDoc(doc(db, "projects", projectId));
             if (!projectDoc.exists()) return null;
-            const projectData = { id: projectDoc.id, ...projectDoc.data() };
+            return { id: projectDoc.id, ...projectDoc.data() };
+        })
+    );
 
-            const membersSnap = await getDocs(query(projectMembersRef, where("project_id", "==", projectId)));
+    // Sort by created_at (newest first)
+    const sortedProjects = projects.filter(Boolean).sort((a: any, b: any) => {
+        const aTime = a.created_at?.toMillis?.() || 0;
+        const bTime = b.created_at?.toMillis?.() || 0;
+        return bTime - aTime;
+    });
+
+    // Paginate in memory
+    let startIndex = 0;
+    if (lastDocId) {
+        const index = sortedProjects.findIndex(p => p.id === lastDocId);
+        if (index !== -1) {
+            startIndex = index + 1;
+        }
+    }
+
+    const pageProjects = sortedProjects.slice(startIndex, startIndex + pageSize);
+    const hasMore = sortedProjects.length > startIndex + pageSize;
+    const nextLastDocId = pageProjects.length > 0 ? pageProjects[pageProjects.length - 1].id : null;
+
+    // Fetch details for page elements only
+    const projectsWithDetails = await Promise.all(
+        pageProjects.map(async (projectData: any) => {
+            const membersSnap = await getDocs(query(projectMembersRef, where("project_id", "==", projectData.id)));
             const members = membersSnap.docs.map(m => m.data());
 
             // fetch task count
-            const tasksSnap = await getDocs(query(tasksRef, where("project_id", "==", projectId)));
+            const tasksSnap = await getDocs(query(tasksRef, where("project_id", "==", projectData.id)));
             const taskCount = tasksSnap.size;
 
             return { ...projectData, members, taskCount };
@@ -46,12 +71,11 @@ export const getProjectList = async (userId: string) => {
     // TODO: Invitation flow with email token, expiry, accept/decline
     // TODO: Activity log insertion on project actions
 
-    // Sort by created_at (newest first)
-    return projects.filter(Boolean).sort((a: any, b: any) => {
-        const aTime = a.created_at?.toMillis?.() || 0;
-        const bTime = b.created_at?.toMillis?.() || 0;
-        return bTime - aTime;
-    });
+    return {
+        data: projectsWithDetails,
+        hasMore,
+        lastDoc: nextLastDocId
+    };
 };
 
 export const getProjectById = async (projectId: string): Promise<any> => {
@@ -210,18 +234,50 @@ export const addMembersToProject = async (projectId: string, members: any[]) => 
     await batch.commit();
 };
 
+export const deleteProject = async (projectId: string) => {
+    const batch = writeBatch(db);
+
+    // 1. Delete project members
+    const membersSnap = await getDocs(query(projectMembersRef, where("project_id", "==", projectId)));
+    membersSnap.forEach((d) => {
+        batch.delete(d.ref);
+    });
+
+    // 2. Delete tasks
+    const tasksSnap = await getDocs(query(tasksRef, where("project_id", "==", projectId)));
+    tasksSnap.forEach((d) => {
+        batch.delete(d.ref);
+    });
+
+    // 3. Delete messages
+    const messagesSnap = await getDocs(query(messagesRef, where("project_id", "==", projectId)));
+    messagesSnap.forEach((d) => {
+        batch.delete(d.ref);
+    });
+
+    // 4. Delete project doc itself
+    const projectDocRef = doc(db, "projects", projectId);
+    batch.delete(projectDocRef);
+
+    await batch.commit();
+};
+
+export const removeMemberFromProject = async (projectId: string, userId: string) => {
+
+    // TODO: if member get removed then what about the task that assigned to him?
+    // - should update status and assignee?
+
+    const membershipId = `${projectId}_${userId}`;
+    const membershipRef = doc(db, "project_members", membershipId);
+    await deleteDoc(membershipRef);
+};
+
 /*
 // TODO: Implement member management functions when needed in the future
 export const updateMemberRole = async (projectId: string, userId: string, role: string) => {
     // const membershipId = `${projectId}_${userId}`;
     // const membershipRef = doc(db, "project_members", membershipId);
     // await updateDoc(membershipRef, { role, updated_at: serverTimestamp() });
-};
-
-export const removeMemberFromProject = async (projectId: string, userId: string) => {
-    // const membershipId = `${projectId}_${userId}`;
-    // const membershipRef = doc(db, "project_members", membershipId);
-    // await deleteDoc(membershipRef);
 };
 
 export const isLastOwner = async (projectId: string, userId: string) => {

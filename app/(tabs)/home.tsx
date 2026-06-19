@@ -1,9 +1,10 @@
 import { useAuth } from "@/components/AuthProvider";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useRouter, useFocusEffect } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   StyleSheet,
@@ -21,28 +22,84 @@ export default function Home() {
 
   const [projectList, setProjectList] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
+  const [lastDocId, setLastDocId] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  useEffect(() => {
-    fetchAllProjects();
-  }, []);
-
-  async function fetchAllProjects() {
+  const fetchProjects = useCallback(async (isLoadMore = false) => {
     if (!provider || !user?.id) return;
+    
+    if (isLoadMore && !hasMore) return;
+
+    if (isLoadMore) {
+      setLoadingMore(true);
+    } else {
+      setPage(1);
+      setLastDocId(null);
+      setHasMore(true);
+    }
+
     try {
-      const data =
-        provider === "firebase"
-          ? await FirebaseProject.getProjectList(user.id)
-          : await SupabaseProject.getProjectList(user.id);
-      setProjectList(data || []);
+      const currentPage = isLoadMore ? (provider === "supabase" ? page + 1 : 1) : 1;
+      const currentCursor = isLoadMore ? (provider === "firebase" ? lastDocId : null) : null;
+
+      let response: any;
+      if (provider === "firebase") {
+        response = await FirebaseProject.getProjectList(user.id, currentCursor, 5);
+      } else {
+        response = await SupabaseProject.getProjectList(user.id, currentPage, 5);
+      }
+
+      const newProjects = response.data || [];
+      const newHasMore = response.hasMore || false;
+
+      if (isLoadMore) {
+        setProjectList(prev => [...prev, ...newProjects]);
+        if (provider === "firebase") {
+          setLastDocId(response.lastDoc);
+        } else {
+          setPage(currentPage);
+        }
+      } else {
+        setProjectList(newProjects);
+        if (provider === "firebase") {
+          setLastDocId(response.lastDoc);
+        }
+      }
+      setHasMore(newHasMore);
     } catch (error) {
       console.log({ error });
+    } finally {
+      setLoadingMore(false);
     }
-  }
+  }, [provider, user?.id, page, lastDocId, hasMore]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchProjects(false);
+    }, [fetchProjects])
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchAllProjects();
+    await fetchProjects(false);
     setRefreshing(false);
+  };
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      fetchProjects(true);
+    }
+  };
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={{ paddingVertical: 20, alignItems: "center" }}>
+        <ActivityIndicator size="small" color={Theme.colors.primary} />
+      </View>
+    );
   };
 
   // TODO: Edit project (name, description, color, icon)
@@ -113,11 +170,17 @@ export default function Home() {
         refreshing={refreshing}
         onRefresh={handleRefresh}
         showsVerticalScrollIndicator={false}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={renderFooter}
         ListHeaderComponent={() => (
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Your Projects</Text>
             <Text style={styles.headerSubtitle}>
-              You have {projectList.length} active project{projectList.length !== 1 ? "s" : ""}
+              {hasMore 
+                ? `Loaded ${projectList.length} active project${projectList.length !== 1 ? "s" : ""}`
+                : `You have ${projectList.length} active project${projectList.length !== 1 ? "s" : ""}`
+              }
             </Text>
           </View>
         )}

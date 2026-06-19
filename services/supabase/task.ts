@@ -97,33 +97,49 @@ export const updateTask = async (taskId: string, updates: Partial<TaskData>) => 
 // TODO: Task reorder (update position field on multiple tasks)
 // TODO: Task delete
 
-export const getTasksByProject = async (projectId: string) => {
+export const getTasksByProject = async (projectId: string, page = 1, pageSize = 7) => {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize; // Fetch 1 extra to check hasMore
+
   const { data, error } = await supabase
     .from("tasks")
     .select("*")
     .eq("project_id", projectId)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .range(from, to);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return data;
+  const hasMore = (data?.length || 0) > pageSize;
+  const paginatedData = hasMore ? data.slice(0, pageSize) : (data || []);
+
+  return { data: paginatedData, hasMore };
 };
 
-export const getTasksByAssignee = async (assigneeId: string) => {
+export const getTasksByAssignee = async (assigneeId: string, page = 1, pageSize = 7) => {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize; // Fetch 1 extra to check hasMore
+
   const { data, error } = await supabase
     .from("tasks")
     .select("*, projects(name)")
     .eq("assignee_id", assigneeId)
-    .order("position", { ascending: true });
+    .order("position", { ascending: true })
+    .range(from, to);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return data.map((task: any) => ({
+  const hasMore = (data?.length || 0) > pageSize;
+  const paginatedData = hasMore ? data.slice(0, pageSize) : (data || []);
+
+  const mappedData = paginatedData.map((task: any) => ({
     ...task,
     project_name: task.projects?.name || "Unknown Project",
   }));
+
+  return { data: mappedData, hasMore };
 };

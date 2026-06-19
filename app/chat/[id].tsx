@@ -129,8 +129,19 @@ export default function ChatConversation() {
         console.log('newMessage from realtime: ', { newMessage });
 
         setMessages(prev => {
-          // Deduplicate: skip if we already have this message (or its optimistic version)
+          // Deduplicate: skip if we already have this message
           if (prev.some(m => m.id === newMessage.id)) return prev;
+
+          // Check if there is a matching optimistic message to replace (same sender and content)
+          const optIdx = prev.findIndex(
+            m => m._optimistic && m.sender_id === newMessage.sender_id && m.content === newMessage.content
+          );
+          if (optIdx !== -1) {
+            const updated = [...prev];
+            updated[optIdx] = newMessage;
+            return updated;
+          }
+
           return [...prev, newMessage];
         });
       });
@@ -196,22 +207,55 @@ export default function ChatConversation() {
     return member?.name || senderId?.slice(0, 6) || "Unknown";
   };
 
-  const renderMessage = ({ item }: { item: any }) => {
+  const renderMessage = ({ item, index }: { item: any; index: number }) => {
     const senderId = item.sender_id || item.user_id;
     const isMe = senderId === user?.id;
     const senderName = getSenderName(senderId);
     const content = item.content || item.message || "";
     const createdAt = resolveDate(item.createdAt_ || item.created_at);
 
+    // Date separator logic
+    let showDateSeparator = false;
+    let dateSeparatorText = "";
+    if (createdAt) {
+      const currentDateString = new Date(createdAt).toDateString();
+      if (index === 0) {
+        showDateSeparator = true;
+        dateSeparatorText = formatDateSeparator(createdAt);
+      } else {
+        const prevItem = messages[index - 1];
+        const prevCreatedAt = resolveDate(prevItem.createdAt_ || prevItem.created_at);
+        if (prevCreatedAt) {
+          const prevDateString = new Date(prevCreatedAt).toDateString();
+          if (currentDateString !== prevDateString) {
+            showDateSeparator = true;
+            dateSeparatorText = formatDateSeparator(createdAt);
+          }
+        } else {
+          showDateSeparator = true;
+          dateSeparatorText = formatDateSeparator(createdAt);
+        }
+      }
+    }
+
     return (
-      <View style={[styles.messageWrapper, isMe ? styles.myMessageWrapper : styles.otherMessageWrapper]}>
-        {!isMe && <Text style={styles.senderName}>{senderName}</Text>}
-        <View style={[styles.bubble, isMe ? styles.myBubble : styles.otherBubble]}>
-          <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
-            {content}
-          </Text>
+      <View style={{ width: "100%" }}>
+        {showDateSeparator && (
+          <View style={styles.dateSeparatorContainer}>
+            <View style={styles.dateSeparatorLine} />
+            <Text style={styles.dateSeparatorText}>{dateSeparatorText}</Text>
+            <View style={styles.dateSeparatorLine} />
+          </View>
+        )}
+        <View style={[styles.messageWrapper, isMe ? styles.myMessageWrapper : styles.otherMessageWrapper]}>
+          {!isMe && <Text style={styles.senderName}>{senderName}</Text>}
+          <View style={[styles.bubble, isMe ? styles.myBubble : styles.otherBubble]}>
+            <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
+              {content}
+            </Text>
+          </View>
+          <Text style={styles.timeText}>{formatTime(createdAt)}</Text>
         </View>
-        <Text style={styles.timeText}>{formatTime(createdAt)}</Text>
       </View>
     );
   };
@@ -412,6 +456,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Theme.colors.textSecondary,
     marginHorizontal: 4,
+  },
+  dateSeparatorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: Theme.spacing.md,
+    gap: Theme.spacing.md,
+    paddingHorizontal: Theme.spacing.lg,
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Theme.colors.border,
+  },
+  dateSeparatorText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Theme.colors.textSecondary,
+    backgroundColor: Theme.colors.background,
+    paddingHorizontal: 8,
   },
   inputContainer: {
     flexDirection: "row",

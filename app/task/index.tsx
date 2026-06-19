@@ -1,20 +1,20 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Alert,
 } from "react-native";
 import { useAuth } from "../../components/AuthProvider";
+import { TaskEditModal } from "../../components/TaskEditModal";
 import { Theme } from "../../constants/Theme";
 import { FirebaseTask } from "../../services/firebase";
 import { SupabaseTask } from "../../services/supabase";
-import { TaskEditModal } from "../../components/TaskEditModal";
 
 const STATUS_FILTERS = [
   { key: "all", label: "All" },
@@ -47,9 +47,19 @@ export default function MyTasks() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
-  const [selectedTaskToEdit, setSelectedTaskToEdit] = useState<any | null>(null);
+  const [selectedTaskToEdit, setSelectedTaskToEdit] = useState<any | null>(
+    null,
+  );
 
-  const handleUpdateTask = async (taskId: string, updates: { status: string; assignee_id: string | null }) => {
+  const [page, setPage] = useState(1);
+  const [lastDocId, setLastDocId] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const handleUpdateTask = async (
+    taskId: string,
+    updates: { status: string; assignee_id: string | null },
+  ) => {
     try {
       if (provider === "firebase") {
         await FirebaseTask.updateTask(taskId, updates);
@@ -64,31 +74,101 @@ export default function MyTasks() {
     }
   };
 
-  useEffect(() => {
-    fetchTasks();
-  }, [provider, user]);
+  const fetchTasks = useCallback(
+    async (isLoadMore = false) => {
+      if (!provider || !user?.id) return;
 
-  const fetchTasks = async () => {
-    if (!provider || !user?.id) return;
-    setLoading(true);
-    setError("");
-    try {
-      const data =
-        provider === "firebase"
-          ? await FirebaseTask.getTasksByAssignee(user.id)
-          : await SupabaseTask.getTasksByAssignee(user.id);
-      setTasks(data || []);
-    } catch (err: any) {
-      setError(err.message || "Failed to load tasks");
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (isLoadMore && !hasMore) return;
+
+      if (isLoadMore) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setError("");
+        setPage(1);
+        setLastDocId(null);
+        setHasMore(true);
+      }
+
+      try {
+        const currentPage = isLoadMore
+          ? provider === "supabase"
+            ? page + 1
+            : 1
+          : 1;
+        const currentCursor = isLoadMore
+          ? provider === "firebase"
+            ? lastDocId
+            : null
+          : null;
+
+        let response: any;
+        if (provider === "firebase") {
+          response = await FirebaseTask.getTasksByAssignee(
+            user.id,
+            currentCursor,
+            7,
+          );
+        } else {
+          response = await SupabaseTask.getTasksByAssignee(
+            user.id,
+            currentPage,
+            7,
+          );
+        }
+
+        const newTasks = response.data || [];
+        const newHasMore = response.hasMore || false;
+
+        if (isLoadMore) {
+          setTasks((prev) => [...prev, ...newTasks]);
+          if (provider === "firebase") {
+            setLastDocId(response.lastDoc);
+          } else {
+            setPage(currentPage);
+          }
+        } else {
+          setTasks(newTasks);
+          if (provider === "firebase") {
+            setLastDocId(response.lastDoc);
+          }
+        }
+        setHasMore(newHasMore);
+      } catch (err: any) {
+        setError(err.message || "Failed to load tasks");
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [provider, user?.id, page, lastDocId, hasMore],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchTasks(false);
+    }, [fetchTasks]),
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchTasks();
+    await fetchTasks(false);
     setRefreshing(false);
+  };
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      fetchTasks(true);
+    }
+  };
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={{ paddingVertical: 20, alignItems: "center" }}>
+        <ActivityIndicator size="small" color={Theme.colors.primary} />
+      </View>
+    );
   };
 
   const filteredTasks =
@@ -175,13 +255,12 @@ export default function MyTasks() {
         </View>
       ) : error ? (
         <View style={styles.centerContainer}>
-          <Feather
-            name="alert-circle"
-            size={48}
-            color={Theme.colors.error}
-          />
+          <Feather name="alert-circle" size={48} color={Theme.colors.error} />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchTasks}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => fetchTasks()}
+          >
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -194,9 +273,13 @@ export default function MyTasks() {
           refreshing={refreshing}
           onRefresh={handleRefresh}
           showsVerticalScrollIndicator={false}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={renderFooter}
           ListHeaderComponent={() => (
             <View style={styles.header}>
               <Text style={styles.headerSubtitle}>
+                {hasMore ? "Loaded " : ""}
                 {tasks.length} task{tasks.length !== 1 ? "s" : ""} assigned
                 {activeFilter !== "all" &&
                   ` · ${filteredTasks.length} ${getStatusLabel(activeFilter).toLowerCase()}`}
