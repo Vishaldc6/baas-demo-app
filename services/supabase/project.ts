@@ -15,8 +15,10 @@ export const getProjectList = async (userId: string, page = 1, pageSize = 5) => 
   const projectIds = userMemberships.map((pm: any) => pm.project_id);
 
   // Paginated fetch of projects data as per project ids
+  // Supabase .range(from, to) is INCLUSIVE on both ends, so .range(0, 5) returns 6 rows.
+  // Fetch pageSize + 1 rows to determine hasMore.
   const from = (page - 1) * pageSize;
-  const to = from + pageSize; // Fetch 1 extra to check hasMore
+  const to = from + pageSize; // inclusive, so this fetches (pageSize + 1) rows
 
   const { data: projects, error: projectError } = await supabase
     .from("projects")
@@ -70,7 +72,7 @@ export const getProjectList = async (userId: string, page = 1, pageSize = 5) => 
 
 
   
-  return { data: projectsWithMembers, hasMore };
+  return { data: projectsWithMembers, hasMore, totalCount: projectIds.length };
 };
 
 export const getProjectById = async (projectId: string) => {

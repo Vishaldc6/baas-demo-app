@@ -2,7 +2,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -22,27 +22,34 @@ export default function Home() {
 
   const [projectList, setProjectList] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(1);
-  const [lastDocId, setLastDocId] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Use refs for pagination cursors to avoid re-creating fetchProjects on every state change
+  const pageRef = useRef(1);
+  const lastDocIdRef = useRef<string | null>(null);
+  const hasMoreRef = useRef(true);
 
   const fetchProjects = useCallback(async (isLoadMore = false) => {
     if (!provider || !user?.id) return;
     
-    if (isLoadMore && !hasMore) return;
+    if (isLoadMore && !hasMoreRef.current) return;
 
     if (isLoadMore) {
       setLoadingMore(true);
     } else {
-      setPage(1);
-      setLastDocId(null);
+      setLoading(true);
+      pageRef.current = 1;
+      lastDocIdRef.current = null;
+      hasMoreRef.current = true;
       setHasMore(true);
     }
 
     try {
-      const currentPage = isLoadMore ? (provider === "supabase" ? page + 1 : 1) : 1;
-      const currentCursor = isLoadMore ? (provider === "firebase" ? lastDocId : null) : null;
+      const currentPage = isLoadMore ? pageRef.current + 1 : 1;
+      const currentCursor = isLoadMore ? lastDocIdRef.current : null;
 
       let response: any;
       if (provider === "firebase") {
@@ -54,26 +61,29 @@ export default function Home() {
       const newProjects = response.data || [];
       const newHasMore = response.hasMore || false;
 
+      setTotalCount(response.totalCount || 0);
+
       if (isLoadMore) {
         setProjectList(prev => [...prev, ...newProjects]);
         if (provider === "firebase") {
-          setLastDocId(response.lastDoc);
-        } else {
-          setPage(currentPage);
+          lastDocIdRef.current = response.lastDoc;
         }
+        pageRef.current = currentPage;
       } else {
         setProjectList(newProjects);
         if (provider === "firebase") {
-          setLastDocId(response.lastDoc);
+          lastDocIdRef.current = response.lastDoc;
         }
       }
+      hasMoreRef.current = newHasMore;
       setHasMore(newHasMore);
     } catch (error) {
       console.log({ error });
     } finally {
+      setLoading(false);
       setLoadingMore(false);
     }
-  }, [provider, user?.id, page, lastDocId, hasMore]);
+  }, [provider, user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -162,9 +172,14 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={projectList}
-        renderItem={renderProjectCard}
+      {loading && projectList.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={Theme.colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={projectList}
+          renderItem={renderProjectCard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshing={refreshing}
@@ -177,10 +192,7 @@ export default function Home() {
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Your Projects</Text>
             <Text style={styles.headerSubtitle}>
-              {hasMore 
-                ? `Loaded ${projectList.length} active project${projectList.length !== 1 ? "s" : ""}`
-                : `You have ${projectList.length} active project${projectList.length !== 1 ? "s" : ""}`
-              }
+              {`You have ${totalCount} active project${totalCount !== 1 ? "s" : ""}`}
             </Text>
           </View>
         )}
@@ -191,7 +203,8 @@ export default function Home() {
             <Text style={styles.emptySubtext}>Tap + to create your first project</Text>
           </View>
         )}
-      />
+        />
+      )}
 
       <TouchableOpacity
         style={styles.fab}
@@ -215,6 +228,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Theme.colors.background,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Theme.spacing.xl,
   },
   listContent: {
     padding: Theme.spacing.lg,

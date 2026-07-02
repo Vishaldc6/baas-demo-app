@@ -74,7 +74,8 @@ export const getProjectList = async (userId: string, lastDocId?: string | null, 
     return {
         data: projectsWithDetails,
         hasMore,
-        lastDoc: nextLastDocId
+        lastDoc: nextLastDocId,
+        totalCount: sortedProjects.length
     };
 };
 

@@ -15,8 +15,8 @@ import {
 } from "react-native";
 import { useAuth } from "../../components/AuthProvider";
 import { Theme } from "../../constants/Theme";
-import { FirebaseProfile } from "../../services/firebase";
-import { SupabaseProfile } from "../../services/supabase";
+import { FirebaseProfile, FirebaseProject, FirebaseTask } from "../../services/firebase";
+import { SupabaseProfile, SupabaseProject, SupabaseTask } from "../../services/supabase";
 
 export default function Profile() {
   const { user, signOut, refreshProfile, provider } = useAuth();
@@ -24,6 +24,7 @@ export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isGeneratingDummy, setIsGeneratingDummy] = useState(false);
 
   // Edit form state — initialised from context user
   const [username, setUsername] = useState(user?.username ?? "");
@@ -108,6 +109,100 @@ export default function Profile() {
     // Reset form to current profile values
     setUsername(user?.username ?? "");
     setIsEditing(false);
+  };
+
+  const handleCreateDummyRecords = async () => {
+    if (!user?.id || !provider) return;
+
+    Alert.alert(
+      "Generate Dummy Records",
+      "This will create 3 demo projects, each with 5 tasks. Are you sure you want to proceed?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Generate",
+          onPress: async () => {
+            setIsGeneratingDummy(true);
+            try {
+              const projectDataTemplates = [
+                {
+                  name: "Alpha Launch Campaign",
+                  description: "Marketing and strategy launch plan for Project Alpha.",
+                  color: "#3B82F6",
+                  icon: "activity",
+                },
+                {
+                  name: "Mobile App Beta Test",
+                  description: "Usability testing, feedback gathering, and bug triaging.",
+                  color: "#10B981",
+                  icon: "smartphone",
+                },
+                {
+                  name: "Brand Design Refresh",
+                  description: "Updating assets, style guidelines, and logo presentations.",
+                  color: "#F59E0B",
+                  icon: "edit-3",
+                },
+              ];
+
+              const taskTemplates = [
+                { title: "Define roadmap and milestones", description: "Establish high-level timelines and deliverables." },
+                { title: "Draft marketing brief", description: "Detail key audiences, messaging, and channels." },
+                { title: "Review competitor pricing models", description: "Collect data on top 3 competitors." },
+                { title: "Coordinate launch logistics", description: "Organize calendars, invitees, and deck slides." },
+                { title: "Prepare release notes", description: "List new features and resolved issues." },
+              ];
+
+              for (let i = 0; i < projectDataTemplates.length; i++) {
+                const projTemplate = projectDataTemplates[i];
+                let projectId = "";
+
+                if (provider === "firebase") {
+                  projectId = await FirebaseProject.createProject(user.id, {
+                    name: projTemplate.name,
+                    description: projTemplate.description,
+                    color: projTemplate.color,
+                    icon: projTemplate.icon,
+                  });
+                } else {
+                  projectId = await SupabaseProject.createProject(user.id, {
+                    name: projTemplate.name,
+                    description: projTemplate.description,
+                    color: projTemplate.color,
+                    icon: projTemplate.icon,
+                  });
+                }
+
+                // Create 5 tasks for this project
+                for (let j = 0; j < taskTemplates.length; j++) {
+                  const taskTemplate = taskTemplates[j];
+                  const taskPayload = {
+                    project_id: projectId,
+                    title: taskTemplate.title,
+                    description: taskTemplate.description,
+                    assignee_id: null,
+                    created_by: user.id,
+                  };
+
+                  if (provider === "firebase") {
+                    await FirebaseTask.createTask(taskPayload);
+                  } else {
+                    await SupabaseTask.createTask(taskPayload);
+                  }
+                }
+              }
+
+              Alert.alert("Success", "Dummy projects and tasks successfully created!");
+            } catch (err: any) {
+              console.error("Failed to generate dummy records:", err);
+              Alert.alert("Error", err.message || "Failed to generate dummy records.");
+            } finally {
+              setIsGeneratingDummy(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // ── Helper: settings option row ────────────────────────────────
@@ -212,14 +307,33 @@ export default function Profile() {
             <Text style={styles.sectionTitle}>Account</Text>
             <View style={styles.card}>
               {renderOption("edit-3", "Edit Profile", () => setIsEditing(true))}
-              {renderOption("bell", "Notifications", () => router.push("/notifications"))}
+              {/* {renderOption("bell", "Notifications", () => router.push("/notifications"))} */}
             </View>
           </View>
 
-          <View style={styles.section}>
+          {/* <View style={styles.section}>
             <Text style={styles.sectionTitle}>Activity</Text>
             <View style={styles.card}>
               {renderOption("clock", "Recent Activity")}
+            </View>
+          </View> */}
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Demo Tools</Text>
+            <View style={styles.card}>
+              {isGeneratingDummy ? (
+                <View style={styles.loaderContainer}>
+                  <ActivityIndicator size="small" color={Theme.colors.primary} />
+                  <Text style={styles.loaderText}>Generating Demo Data...</Text>
+                </View>
+              ) : (
+                renderOption(
+                  "database",
+                  "Generate Dummy Records",
+                  handleCreateDummyRecords,
+                  Theme.colors.primary
+                )
+              )}
             </View>
           </View>
 
@@ -425,5 +539,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: Theme.colors.error,
+  },
+  loaderContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Theme.spacing.md,
+    gap: Theme.spacing.sm,
+  },
+  loaderText: {
+    fontSize: 15,
+    color: Theme.colors.textSecondary,
+    fontWeight: "600",
   },
 });
