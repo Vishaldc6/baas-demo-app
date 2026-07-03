@@ -147,14 +147,6 @@ export default function ChatList() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Theme.colors.primary} />
         }
-        ListHeaderComponent={() => (
-          <View style={styles.header}>
-            <View style={styles.searchBar}>
-              <Feather name="search" size={18} color={Theme.colors.textSecondary} />
-              <Text style={styles.searchPlaceholder}>Search messages...</Text>
-            </View>
-          </View>
-        )}
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
             <Feather name="message-square" size={48} color={Theme.colors.textSecondary} />
