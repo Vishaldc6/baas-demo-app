@@ -42,12 +42,11 @@ export const uploadTaskAttachment = async (taskId: string, file: any): Promise<s
   const storagePath = `task-attachments/task-${taskId}/${fileName}`;
   const storageRef = ref(storage, storagePath);
 
-  // Read the file as a blob for upload
-  const response = await fetch(file.uri);
-  const blob = await response.blob();
+  // Read the file as an ArrayBuffer
+  const arrayBuffer = await fetch(file.uri).then((res) => res.arrayBuffer());
 
   // Upload to Firebase Storage
-  await uploadBytes(storageRef, blob, {
+  await uploadBytes(storageRef, arrayBuffer, {
     contentType: file.mimeType || "application/octet-stream",
   });
 

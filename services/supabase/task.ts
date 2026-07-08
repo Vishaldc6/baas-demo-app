@@ -10,7 +10,7 @@ export interface TaskData {
   created_by: string;
   due_date?: string;
   position?: number;
-  attachment?: any
+  attachment?: any;
 }
 
 export const createTask = async (taskData: TaskData) => {
@@ -45,18 +45,20 @@ export const createTask = async (taskData: TaskData) => {
   return data;
 };
 
-export const uploadTaskAttachment = async (taskId: string, file: any): Promise<string> => {
+export const uploadTaskAttachment = async (
+  taskId: string,
+  file: any,
+): Promise<string> => {
   const fileName = file.name || "attachment.file";
   const filePath = `task-${taskId}/${fileName}`;
 
-  // Read the file as a blob for upload
-  const response = await fetch(file.uri);
-  const blob = await response.blob();
+  // Read the file as an ArrayBuffer (official Supabase docs pattern)
+  const arrayBuffer = await fetch(file.uri).then((res) => res.arrayBuffer());
 
   // Upload to the "task-attachments" bucket (upsert to overwrite previous attachment)
   const { error: uploadError } = await supabase.storage
     .from("task-attachments")
-    .upload(filePath, blob, {
+    .upload(filePath, arrayBuffer, {
       contentType: file.mimeType || "application/octet-stream",
       upsert: true,
     });
@@ -77,13 +79,18 @@ export const uploadTaskAttachment = async (taskId: string, file: any): Promise<s
     .eq("id", taskId);
 
   if (updateError) {
-    throw new Error(`Failed to update task with attachment: ${updateError.message}`);
+    throw new Error(
+      `Failed to update task with attachment: ${updateError.message}`,
+    );
   }
 
   return publicUrl;
 };
 
-export const updateTask = async (taskId: string, updates: Partial<TaskData>) => {
+export const updateTask = async (
+  taskId: string,
+  updates: Partial<TaskData>,
+) => {
   const { error } = await supabase
     .from("tasks")
     .update(updates)
@@ -95,7 +102,11 @@ export const updateTask = async (taskId: string, updates: Partial<TaskData>) => 
 // TODO: Task reorder (update position field on multiple tasks)
 // TODO: Task delete
 
-export const getTasksByProject = async (projectId: string, page = 1, pageSize = 7) => {
+export const getTasksByProject = async (
+  projectId: string,
+  page = 1,
+  pageSize = 7,
+) => {
   const from = (page - 1) * pageSize;
   const to = from + pageSize; // Fetch 1 extra to check hasMore
 
@@ -111,12 +122,16 @@ export const getTasksByProject = async (projectId: string, page = 1, pageSize = 
   }
 
   const hasMore = (data?.length || 0) > pageSize;
-  const paginatedData = hasMore ? data.slice(0, pageSize) : (data || []);
+  const paginatedData = hasMore ? data.slice(0, pageSize) : data || [];
 
   return { data: paginatedData, hasMore };
 };
 
-export const getTasksByAssignee = async (assigneeId: string, page = 1, pageSize = 7) => {
+export const getTasksByAssignee = async (
+  assigneeId: string,
+  page = 1,
+  pageSize = 7,
+) => {
   const from = (page - 1) * pageSize;
   const to = from + pageSize; // Fetch 1 extra to check hasMore
 
@@ -132,7 +147,7 @@ export const getTasksByAssignee = async (assigneeId: string, page = 1, pageSize 
   }
 
   const hasMore = (data?.length || 0) > pageSize;
-  const paginatedData = hasMore ? data.slice(0, pageSize) : (data || []);
+  const paginatedData = hasMore ? data.slice(0, pageSize) : data || [];
 
   const mappedData = paginatedData.map((task: any) => ({
     ...task,

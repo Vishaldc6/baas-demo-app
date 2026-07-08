@@ -103,12 +103,11 @@ export const uploadAvatar = async (
   // Create a reference to the storage location
   const storageRef = ref(storage, storagePath);
 
-  // Read the file as a blob for upload
-  const response = await fetch(fileUri);
-  const blob = await response.blob();
+  // Read the file as an ArrayBuffer
+  const arrayBuffer = await fetch(fileUri).then((res) => res.arrayBuffer());
 
   // Upload to Firebase Storage (overwrites if file already exists at this path)
-  await uploadBytes(storageRef, blob, {
+  await uploadBytes(storageRef, arrayBuffer, {
     contentType: `image/${ext}`,
   });
 

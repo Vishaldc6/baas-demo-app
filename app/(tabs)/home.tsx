@@ -1,7 +1,7 @@
 import { useAuth } from "@/components/AuthProvider";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -32,63 +32,74 @@ export default function Home() {
   const lastDocIdRef = useRef<string | null>(null);
   const hasMoreRef = useRef(true);
 
-  const fetchProjects = useCallback(async (isLoadMore = false) => {
-    if (!provider || !user?.id) return;
-    
-    if (isLoadMore && !hasMoreRef.current) return;
+  const fetchProjects = useCallback(
+    async (isLoadMore = false) => {
+      if (!provider || !user?.id) return;
 
-    if (isLoadMore) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-      pageRef.current = 1;
-      lastDocIdRef.current = null;
-      hasMoreRef.current = true;
-      setHasMore(true);
-    }
-
-    try {
-      const currentPage = isLoadMore ? pageRef.current + 1 : 1;
-      const currentCursor = isLoadMore ? lastDocIdRef.current : null;
-
-      let response: any;
-      if (provider === "firebase") {
-        response = await FirebaseProject.getProjectList(user.id, currentCursor, 5);
-      } else {
-        response = await SupabaseProject.getProjectList(user.id, currentPage, 5);
-      }
-
-      const newProjects = response.data || [];
-      const newHasMore = response.hasMore || false;
-
-      setTotalCount(response.totalCount || 0);
+      if (isLoadMore && !hasMoreRef.current) return;
 
       if (isLoadMore) {
-        setProjectList(prev => [...prev, ...newProjects]);
-        if (provider === "firebase") {
-          lastDocIdRef.current = response.lastDoc;
-        }
-        pageRef.current = currentPage;
+        setLoadingMore(true);
       } else {
-        setProjectList(newProjects);
-        if (provider === "firebase") {
-          lastDocIdRef.current = response.lastDoc;
-        }
+        setLoading(true);
+        pageRef.current = 1;
+        lastDocIdRef.current = null;
+        hasMoreRef.current = true;
+        setHasMore(true);
       }
-      hasMoreRef.current = newHasMore;
-      setHasMore(newHasMore);
-    } catch (error) {
-      console.log({ error });
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [provider, user?.id]);
+
+      try {
+        const currentPage = isLoadMore ? pageRef.current + 1 : 1;
+        const currentCursor = isLoadMore ? lastDocIdRef.current : null;
+
+        let response: any;
+        if (provider === "firebase") {
+          response = await FirebaseProject.getProjectList(
+            user.id,
+            currentCursor,
+            5,
+          );
+        } else {
+          response = await SupabaseProject.getProjectList(
+            user.id,
+            currentPage,
+            5,
+          );
+        }
+
+        const newProjects = response.data || [];
+        const newHasMore = response.hasMore || false;
+
+        setTotalCount(response.totalCount || 0);
+
+        if (isLoadMore) {
+          setProjectList((prev) => [...prev, ...newProjects]);
+          if (provider === "firebase") {
+            lastDocIdRef.current = response.lastDoc;
+          }
+          pageRef.current = currentPage;
+        } else {
+          setProjectList(newProjects);
+          if (provider === "firebase") {
+            lastDocIdRef.current = response.lastDoc;
+          }
+        }
+        hasMoreRef.current = newHasMore;
+        setHasMore(newHasMore);
+      } catch (error) {
+        console.log({ error });
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [provider, user?.id],
+  );
 
   useFocusEffect(
     useCallback(() => {
       fetchProjects(false);
-    }, [fetchProjects])
+    }, [fetchProjects]),
   );
 
   const handleRefresh = async () => {
@@ -130,7 +141,12 @@ export default function Home() {
         activeOpacity={0.7}
       >
         <View style={styles.cardHeader}>
-          <View style={[styles.colorDot, { backgroundColor: item.color || Theme.colors.primary }]} />
+          <View
+            style={[
+              styles.colorDot,
+              { backgroundColor: item.color || Theme.colors.primary },
+            ]}
+          />
           <Text style={styles.cardTitle}>{item.name}</Text>
         </View>
 
@@ -145,7 +161,9 @@ export default function Home() {
                 <Image
                   key={m.id || m.user_id || i}
                   source={{
-                    uri: m.avatar || `https://ui-avatars.com/api/?name=${m.name || "U"}&background=2563EB&color=fff&size=20`,
+                    uri:
+                      m.avatar ||
+                      `https://ui-avatars.com/api/?name=${m.name || "U"}&background=2563EB&color=fff&size=20`,
                   }}
                   style={[
                     styles.miniAvatar,
@@ -154,16 +172,30 @@ export default function Home() {
                 />
               ))}
               {(item.members?.length || 0) > maxAvatars && (
-                <View style={[styles.miniAvatar, styles.miniAvatarMore, { marginLeft: -8 }]}>
-                  <Text style={styles.miniAvatarMoreText}>+{item.members.length - maxAvatars}</Text>
+                <View
+                  style={[
+                    styles.miniAvatar,
+                    styles.miniAvatarMore,
+                    { marginLeft: -8 },
+                  ]}
+                >
+                  <Text style={styles.miniAvatarMoreText}>
+                    +{item.members.length - maxAvatars}
+                  </Text>
                 </View>
               )}
             </View>
-            <Text style={styles.memberText}>{item.members?.length || 0} members</Text>
+            <Text style={styles.memberText}>
+              {item.members?.length || 0} members
+            </Text>
           </View>
           <View style={styles.footerRight}>
             <Text style={styles.taskCount}>{item.taskCount || 0} tasks</Text>
-            <Feather name="chevron-right" size={18} color={Theme.colors.textSecondary} />
+            <Feather
+              name="chevron-right"
+              size={18}
+              color={Theme.colors.textSecondary}
+            />
           </View>
         </View>
       </TouchableOpacity>
@@ -180,29 +212,31 @@ export default function Home() {
         <FlatList
           data={projectList}
           renderItem={renderProjectCard}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-        showsVerticalScrollIndicator={false}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.3}
-        ListFooterComponent={renderFooter}
-        ListHeaderComponent={() => (
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Your Projects</Text>
-            <Text style={styles.headerSubtitle}>
-              {`You have ${totalCount} active project${totalCount !== 1 ? "s" : ""}`}
-            </Text>
-          </View>
-        )}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <Feather name="folder" size={48} color={Theme.colors.border} />
-            <Text style={styles.emptyText}>No projects yet</Text>
-            <Text style={styles.emptySubtext}>Tap + to create your first project</Text>
-          </View>
-        )}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          showsVerticalScrollIndicator={false}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={renderFooter}
+          ListHeaderComponent={() => (
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Your Projects</Text>
+              <Text style={styles.headerSubtitle}>
+                {`You have ${totalCount} active project${totalCount !== 1 ? "s" : ""}`}
+              </Text>
+            </View>
+          )}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Feather name="folder" size={48} color={Theme.colors.border} />
+              <Text style={styles.emptyText}>No projects yet</Text>
+              <Text style={styles.emptySubtext}>
+                Tap + to create your first project
+              </Text>
+            </View>
+          )}
         />
       )}
 
